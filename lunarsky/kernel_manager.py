@@ -27,7 +27,7 @@ def download_kernels(furnish=True):
                     'fk/satellites/moon_assoc_me.tf']
 
     kernel_urls = [_naif_kernel_url + '/' + kn for kn in kernel_names]
-    kernel_paths = download_files_in_parallel(kernel_urls, cache=True, pkgname='lunarsky')
+    kernel_paths = download_files_in_parallel(kernel_urls, cache=True, pkgname='lunarsky', show_progress=False)
 
     if furnish:
         for kern in kernel_paths:
@@ -80,3 +80,11 @@ def topo_frame_def(latitude, longitude, moon=False):
     frame_specs = [s.format(idnum, station_name, fm_center_id, relative, mat) for s in fmt_strs]
 
     return station_name, idnum, frame_specs
+
+
+def cleanup():
+    # TODO Clear the kernel pool
+    return 0
+
+
+KERNEL_PATHS = download_kernels()
