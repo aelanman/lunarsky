@@ -1,0 +1,363 @@
+
+from warnings import warn
+import collections
+import socket
+import json
+import urllib.request
+import urllib.error
+import urllib.parse
+
+import numpy as np
+from astropy import units as u
+from astropy import constants as consts
+from astropy.units.quantity import QuantityInfoBase
+from astropy.utils.exceptions import AstropyUserWarning
+from astropy.coordinates.matrix_utilities import rotation_matrix
+from astropy.coordinates.angles import Longitude, Latitude
+from astropy.coordinates.earth import GeodeticLocation
+from astropy.coordinates.representation import CartesianRepresentation, CartesianDifferential
+from astropy.coordinates.errors import UnknownSiteException
+
+__all__ = ['MoonLocation']
+
+
+class MoonLocationInfo(QuantityInfoBase):
+    """
+    Container for meta information like name, description, format.  This is
+    required when the object is used as a mixin column within a table, but can
+    be used as a general way to store meta information.
+    """
+    _represent_as_dict_attrs = ('x', 'y', 'z')
+
+    def _construct_from_dict(self, map):
+        out = self._parent_cls(**map)
+        return out
+
+    def new_like(self, cols, length, metadata_conflicts='warn', name=None):
+        """
+        Return a new MoonLocation instance which is consistent with the
+        input ``cols`` and has ``length`` rows.
+
+        This is intended for creating an empty column object whose elements can
+        be set in-place for table operations like join or vstack.
+
+        Parameters
+        ----------
+        cols : list
+            List of input columns
+        length : int
+            Length of the output column object
+        metadata_conflicts : str ('warn'|'error'|'silent')
+            How to handle metadata conflicts
+        name : str
+            Output column name
+
+        Returns
+        -------
+        col : MoonLocation (or subclass)
+            Empty instance of this class consistent with ``cols``
+        """
+        # Very similar to QuantityInfo.new_like, but the creation of the
+        # map is different enough that this needs its own rouinte.
+        # Get merged info attributes shape, dtype, format, description.
+        attrs = self.merge_cols_attributes(cols, metadata_conflicts, name,
+                                           ('meta', 'format', 'description'))
+        # The above raises an error if the dtypes do not match, but returns
+        # just the string representation, which is not useful, so remove.
+        attrs.pop('dtype')
+        # Make empty EarthLocation using the dtype and unit of the last column.
+        # Use zeros so we do not get problems for possible conversion to
+        # geodetic coordinates.
+        shape = (length,) + attrs.pop('shape')
+        data = u.Quantity(np.zeros(shape=shape, dtype=cols[0].dtype),
+                          unit=cols[0].unit, copy=False)
+        # Get arguments needed to reconstruct class
+        map = {key: (data[key] if key in 'xyz' else getattr(cols[-1], key))
+               for key in self._represent_as_dict_attrs}
+        out = self._construct_from_dict(map)
+        # Set remaining info attributes
+        for attr, value in attrs.items():
+            setattr(out.info, attr, value)
+
+        return out
+
+
+class MoonLocation(u.Quantity):
+    """
+    Location on the Moon.
+
+    There are two ``selenocentric'' coordinate systems in common use:
+        - The Mean Axis / Polar axis (ME) system defines the z-axis as the mean rotational
+    axis of the Moon, while the prime meridian is set by the mean Earth direction.
+        - The Principal Axes (PA) frame is defined by the principal axes of the Moon.
+
+    This class uses the ME frame.
+
+    Positions may be defined in Cartesian (x, y, z) coordinates with respect to the
+    center of mass of the Moon, or in ``geodetic'' coordinates (longitude, latitude). In geodetic coordinates,
+    positions are on the surface exactly.
+
+    (See "A Standardized Lunar Coordinate System for the Lunar Reconnaissance Orbiter and Lunar Datasets")
+        (TODO -- Add this reference)
+
+
+    Notes
+    -----
+    This class fits into the coordinates transformation framework in that it
+    encodes a position on the `~astropy.coordinates.MCMF` frame.  To get a
+    proper `~astropy.coordinates.MCMF` object from this object, use the ``mcmf``
+    property.
+    """
+
+    _location_dtype = np.dtype({'names': ['x', 'y', 'z'],
+                                'formats': [np.float64]*3})
+    _array_dtype = np.dtype((np.float64, (3,)))
+
+    _lunar_radius = 1737.1e3  # m
+
+    info = MoonLocationInfo()
+
+    def __new__(cls, *args, **kwargs):
+        # TODO: needs copy argument and better dealing with inputs.
+        if (len(args) == 1 and len(kwargs) == 0 and
+                isinstance(args[0], MoonLocation)):
+            return args[0].copy()
+        try:
+            self = cls.from_selenocentric(*args, **kwargs)
+        except (u.UnitsError, TypeError) as exc_geocentric:
+            try:
+                self = cls.from_geodetic(*args, **kwargs)
+            except Exception as exc_geodetic:
+                raise TypeError('Coordinates could not be parsed as either '
+                                'selenocentric or geodetic, with respective '
+                                'exceptions "{}" and "{}"'
+                                .format(exc_geocentric, exc_geodetic))
+        return self
+
+    @classmethod
+    def from_selenocentric(cls, x, y, z, unit=None):
+        """
+        Location on the Moon, initialized from selenocentric coordinates.
+
+        Parameters
+        ----------
+        x, y, z : `~astropy.units.Quantity` or array_like
+            Cartesian coordinates.  If not quantities, ``unit`` should be given.
+        unit : `~astropy.units.UnitBase` object or None
+            Physical unit of the coordinate values.  If ``x``, ``y``, and/or
+            ``z`` are quantities, they will be converted to this unit.
+
+        Raises
+        ------
+        astropy.units.UnitsError
+            If the units on ``x``, ``y``, and ``z`` do not match or an invalid
+            unit is given.
+        ValueError
+            If the shapes of ``x``, ``y``, and ``z`` do not match.
+        TypeError
+            If ``x`` is not a `~astropy.units.Quantity` and no unit is given.
+        """
+        if unit is None:
+            try:
+                unit = x.unit
+            except AttributeError:
+                raise TypeError("Selenocentric coordinates should be Quantities "
+                                "unless an explicit unit is given.")
+        else:
+            unit = u.Unit(unit)
+
+        if unit.physical_type != 'length':
+            raise u.UnitsError("Selenocentric coordinates should be in "
+                               "units of length.")
+
+        try:
+            x = u.Quantity(x, unit, copy=False)
+            y = u.Quantity(y, unit, copy=False)
+            z = u.Quantity(z, unit, copy=False)
+        except u.UnitsError:
+            raise u.UnitsError("Selenocentric coordinate units should all be "
+                               "consistent.")
+
+        x, y, z = np.broadcast_arrays(x, y, z)
+        struc = np.empty(x.shape, cls._location_dtype)
+        struc['x'], struc['y'], struc['z'] = x, y, z
+        return super().__new__(cls, struc, unit, copy=False)
+
+    @classmethod
+    def from_lonlatheight(cls, lon, lat, height=0.):
+        """
+        Location on the Moon, from latitude and longitude.
+
+        Parameters
+        ----------
+        lon : `~astropy.coordinates.Longitude` or float
+            Lunar East longitude.  Can be anything that initialises an
+            `~astropy.coordinates.Angle` object (if float, in degrees).
+        lat : `~astropy.coordinates.Latitude` or float
+            Lunar latitude.  Can be anything that initialises an
+            `~astropy.coordinates.Latitude` object (if float, in degrees).
+        height : `~astropy.units.Quantity` or float, optional
+            Height above reference sphere (if float, in meters; default: 0).
+            The reference sphere is a sphere of radius 1737.1 kilometers,
+            from the center of mass of the Moon.
+
+        Raises
+        ------
+        astropy.units.UnitsError
+            If the units on ``lon`` and ``lat`` are inconsistent with angular
+            ones, or that on ``height`` with a length.
+        ValueError
+            If ``lon``, ``lat``, and ``height`` do not have the same shape, or
+
+        Notes
+        -----
+
+        latitude is defined relative to an equator 90 degrees
+        off from the mean rotation axis. Longitude is defined
+        relative to a prime meridian, which is itself given by
+        the mean position of the "sub-Earth" point on the lunar surface.
+
+        """
+        lon = Longitude(lon, u.degree, wrap_angle=180 * u.degree, copy=False)
+        lat = Latitude(lat, u.degree, copy=False)
+        # don't convert to m by default, so we can use the height unit below.
+        if not isinstance(height, u.Quantity):
+            height = u.Quantity(height, u.m, copy=False)
+
+        if not lon.shape == lat.shape:
+            raise ValueError("Inconsistent quantity shapes: {}, {}".format(str(lon.shape), str(lat.shape)))
+        # get selenocentric coordinates. Have to give one-dimensional array.
+
+        lunar_radius = u.Quantity(cls._lunar_radius, u.m, copy=False)
+
+        Npts = lon.size
+        xyz = np.zeros((Npts, 3))
+        xyz[:, 0] = ((lunar_radius + height) * np.cos(lat) * np.cos(lon))
+        xyz[:, 1] = ((lunar_radius + height) * np.cos(lat) * np.sin(lon))
+        xyz[:, 2] = ((lunar_radius + height) * np.sin(lat))
+
+        xyz = np.squeeze(xyz)
+
+        self = xyz.ravel().view(cls._location_dtype,
+                                cls).reshape(xyz.shape[:-1])
+        self._unit = u.meter
+        return self.to(height.unit)
+
+    @property
+    def geodetic(self):
+        """Convert to geodetic coordinates."""
+        return self.to_geodetic()
+
+    def to_geodetic(self):
+        """Convert to geodetic coordinates (lat, lon, height).
+
+        Returns
+        -------
+        (lon, lat, height) : tuple
+            The tuple contains instances of `~astropy.coordinates.Longitude`,
+            `~astropy.coordinates.Latitude`, and `~astropy.units.Quantity`
+
+        """
+        self_xyz = self.to(u.meter).view(self._array_dtype, np.ndarray)
+
+        lat = np.arctan2(self_xyz[:, 2])
+        lon = np.arctan2(self_xyz[:, 1], self_xyz[:, 0])
+        height = self._lunar_radius - np.linalg.norm(self_xyz, axis=1)
+
+        return GeodeticLocation(
+            Longitude(lon * u.radian, u.degree,
+                      wrap_angle=180.*u.degree, copy=False),
+            Latitude(lat * u.radian, u.degree, copy=False),
+            u.Quantity(height * u.meter, self.unit, copy=False))
+
+    @property
+    def lon(self):
+        """Longitude of the location"""
+        return self.geodetic[0]
+
+    @property
+    def lat(self):
+        """Longitude of the location"""
+        return self.geodetic[1]
+
+    @property
+    def height(self):
+        """Height of the location"""
+        return self.geodetic[2]
+
+    # mostly for symmetry with geodetic and to_geodetic.
+    @property
+    def selenocentric(self):
+        """Convert to a tuple with X, Y, and Z as quantities"""
+        return self.to_selenocentric()
+
+    def to_selenocentric(self):
+        """Convert to a tuple with X, Y, and Z as quantities"""
+        return (self.x, self.y, self.z)
+
+    def get_mcmf(self, obstime=None):
+        """
+        Generates an `~astropy.coordinates.ITRS` object with the location of
+        this object at the requested ``obstime``.
+
+        Parameters
+        ----------
+        obstime : `~astropy.time.Time` or None
+            The ``obstime`` to apply to the new `~astropy.coordinates.ITRS`, or
+            if None, the default ``obstime`` will be used.
+
+        Returns
+        -------
+        itrs : `~astropy.coordinates.ITRS`
+            The new object in the ITRS frame
+        """
+        # do this here to prevent a series of complicated circular imports
+        from . import MCMF
+        return MCMF(x=self.x, y=self.y, z=self.z, obstime=obstime)
+
+    mcmf = property(get_mcmf, doc="""An `~astropy.coordinates.MCMF` object  with
+                                     for the location of this object at the
+                                     default ``obstime``.""")
+
+    @property
+    def x(self):
+        """The X component of the selenocentric coordinates."""
+        return self['x']
+
+    @property
+    def y(self):
+        """The Y component of the selenocentric coordinates."""
+        return self['y']
+
+    @property
+    def z(self):
+        """The Z component of the selenocentric coordinates."""
+        return self['z']
+
+    def __getitem__(self, item):
+        result = super().__getitem__(item)
+        if result.dtype is self.dtype:
+            return result.view(self.__class__)
+        else:
+            return result.view(u.Quantity)
+
+    def __array_finalize__(self, obj):
+        super().__array_finalize__(obj)
+
+    def __len__(self):
+        if self.shape == ():
+            raise IndexError('0-d EarthLocation arrays cannot be indexed')
+        else:
+            return super().__len__()
+
+    def _to_value(self, unit, equivalencies=[]):
+        """Helper method for to and to_value."""
+        # Conversion to another unit in both ``to`` and ``to_value`` goes
+        # via this routine. To make the regular quantity routines work, we
+        # temporarily turn the structured array into a regular one.
+        array_view = self.view(self._array_dtype, np.ndarray)
+        if equivalencies == []:
+            equivalencies = self._equivalencies
+        new_array = self.unit.to(unit, array_view, equivalencies=equivalencies)
+        return new_array.view(self.dtype).reshape(self.shape)
+
