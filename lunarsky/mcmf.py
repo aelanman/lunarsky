@@ -4,7 +4,6 @@ from astropy.coordinates.representation import CartesianRepresentation, Cartesia
 from astropy.coordinates.baseframe import BaseCoordinateFrame, base_doc
 from astropy.coordinates.attributes import TimeAttribute
 from astropy.time import Time
-from astropy.utils.data import download_files_in_parallel
 
 from astropy.coordinates.baseframe import frame_transform_graph
 from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
@@ -15,9 +14,8 @@ import spiceypy as spice
 
 __all__ = ['MCMF']
 
-_naif_kernel_url = 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels'
-
 DEFAULT_OBSTIME = Time('J2000', scale='tt')
+
 
 @format_doc(base_doc, components="", footer="")
 class MCMF(BaseCoordinateFrame):
@@ -45,23 +43,14 @@ class MCMF(BaseCoordinateFrame):
         return MoonLocation(x=cart.x, y=cart.y, z=cart.z)
 
 
+# Transforms
+
 def icrs_to_mcmf_mat(time):
-    #  Rotation matrix from ICRS to MOON_ME
+    # Rotation matrix from ICRS to MOON_ME
     # time = single astropy Time object.
-
-    kernel_names = ['pck/moon_pa_de421_1900-2050.bpc',
-                    'fk/satellites/moon_080317.tf',
-                    'fk/satellites/moon_assoc_me.tf']
-
-    kernel_urls = [_naif_kernel_url + '/' + kn for kn in kernel_names]
-    kernel_paths = download_files_in_parallel(kernel_urls, cache=True, pkgname='lunarsky')
-
-    for kern in kernel_paths:
-        spice.furnsh(kern)
 
     # Ephemeris time = seconds since J2000
     et = (time - Time('J2000')).sec
-
     mat = spice.pxform('J2000', 'MOON_ME', et)
 
     return mat

@@ -1,24 +1,13 @@
 
-from warnings import warn
-import collections
-import socket
-import json
-import urllib.request
-import urllib.error
-import urllib.parse
 
 import numpy as np
 from astropy import units as u
-from astropy import constants as consts
 from astropy.units.quantity import QuantityInfoBase
-from astropy.utils.exceptions import AstropyUserWarning
-from astropy.coordinates.matrix_utilities import rotation_matrix
 from astropy.coordinates.angles import Longitude, Latitude
 from astropy.coordinates.earth import GeodeticLocation
-from astropy.coordinates.representation import CartesianRepresentation, CartesianDifferential
-from astropy.coordinates.errors import UnknownSiteException
+from astropy.coordinates.attributes import Attribute
 
-__all__ = ['MoonLocation']
+__all__ = ['MoonLocation', 'MoonLocationAttribute']
 
 
 class MoonLocationInfo(QuantityInfoBase):
@@ -65,9 +54,9 @@ class MoonLocationInfo(QuantityInfoBase):
         # The above raises an error if the dtypes do not match, but returns
         # just the string representation, which is not useful, so remove.
         attrs.pop('dtype')
-        # Make empty EarthLocation using the dtype and unit of the last column.
+        # Make empty MoonLocation using the dtype and unit of the last column.
         # Use zeros so we do not get problems for possible conversion to
-        # geodetic coordinates.
+        # selenodetic coordinates.
         shape = (length,) + attrs.pop('shape')
         data = u.Quantity(np.zeros(shape=shape, dtype=cols[0].dtype),
                           unit=cols[0].unit, copy=False)
@@ -94,7 +83,7 @@ class MoonLocation(u.Quantity):
     This class uses the ME frame.
 
     Positions may be defined in Cartesian (x, y, z) coordinates with respect to the
-    center of mass of the Moon, or in ``geodetic'' coordinates (longitude, latitude). In geodetic coordinates,
+    center of mass of the Moon, or in ``selenodetic'' coordinates (longitude, latitude). In selenodetic coordinates,
     positions are on the surface exactly.
 
     (See "A Standardized Lunar Coordinate System for the Lunar Reconnaissance Orbiter and Lunar Datasets")
@@ -110,7 +99,7 @@ class MoonLocation(u.Quantity):
     """
 
     _location_dtype = np.dtype({'names': ['x', 'y', 'z'],
-                                'formats': [np.float64]*3})
+                                'formats': [np.float64] * 3})
     _array_dtype = np.dtype((np.float64, (3,)))
 
     _lunar_radius = 1737.1e3  # m
@@ -123,15 +112,15 @@ class MoonLocation(u.Quantity):
                 isinstance(args[0], MoonLocation)):
             return args[0].copy()
         try:
-            self = cls.from_selenocentric(*args, **kwargs)
+            self = cls.from_selenodetic(*args, **kwargs)
         except (u.UnitsError, TypeError) as exc_geocentric:
             try:
-                self = cls.from_geodetic(*args, **kwargs)
-            except Exception as exc_geodetic:
+                self = cls.from_selenodetic(*args, **kwargs)
+            except Exception as exc_selenodetic:
                 raise TypeError('Coordinates could not be parsed as either '
-                                'selenocentric or geodetic, with respective '
+                                'selenocentric or selenodetic, with respective '
                                 'exceptions "{}" and "{}"'
-                                .format(exc_geocentric, exc_geodetic))
+                                .format(exc_geocentric, exc_selenodetic))
         return self
 
     @classmethod
@@ -184,7 +173,7 @@ class MoonLocation(u.Quantity):
         return super().__new__(cls, struc, unit, copy=False)
 
     @classmethod
-    def from_lonlatheight(cls, lon, lat, height=0.):
+    def from_selenodetic(cls, lon, lat, height=0.):
         """
         Location on the Moon, from latitude and longitude.
 
@@ -244,12 +233,12 @@ class MoonLocation(u.Quantity):
         return self.to(height.unit)
 
     @property
-    def geodetic(self):
-        """Convert to geodetic coordinates."""
-        return self.to_geodetic()
+    def selenodetic(self):
+        """Convert to selenodetic coordinates."""
+        return self.to_selenodetic()
 
-    def to_geodetic(self):
-        """Convert to geodetic coordinates (lat, lon, height).
+    def to_selenodetic(self):
+        """Convert to selenodetic coordinates (lat, lon, height).
 
         Returns
         -------
@@ -259,33 +248,33 @@ class MoonLocation(u.Quantity):
 
         """
         self_xyz = self.to(u.meter).view(self._array_dtype, np.ndarray)
-
-        lat = np.arctan2(self_xyz[:, 2])
+        self_xyz = np.atleast_2d(self_xyz)
+        lat = np.arctan(self_xyz[:, 2])
         lon = np.arctan2(self_xyz[:, 1], self_xyz[:, 0])
         height = self._lunar_radius - np.linalg.norm(self_xyz, axis=1)
 
         return GeodeticLocation(
             Longitude(lon * u.radian, u.degree,
-                      wrap_angle=180.*u.degree, copy=False),
+                      wrap_angle=180. * u.degree, copy=False),
             Latitude(lat * u.radian, u.degree, copy=False),
             u.Quantity(height * u.meter, self.unit, copy=False))
 
     @property
     def lon(self):
         """Longitude of the location"""
-        return self.geodetic[0]
+        return self.selenodetic[0]
 
     @property
     def lat(self):
         """Longitude of the location"""
-        return self.geodetic[1]
+        return self.selenodetic[1]
 
     @property
     def height(self):
         """Height of the location"""
-        return self.geodetic[2]
+        return self.selenodetic[2]
 
-    # mostly for symmetry with geodetic and to_geodetic.
+    # mostly for symmetry with selenodetic and to_selenodetic.
     @property
     def selenocentric(self):
         """Convert to a tuple with X, Y, and Z as quantities"""
@@ -346,7 +335,7 @@ class MoonLocation(u.Quantity):
 
     def __len__(self):
         if self.shape == ():
-            raise IndexError('0-d EarthLocation arrays cannot be indexed')
+            raise IndexError('0-d MoonLocation arrays cannot be indexed')
         else:
             return super().__len__()
 
@@ -361,3 +350,56 @@ class MoonLocation(u.Quantity):
         new_array = self.unit.to(unit, array_view, equivalencies=equivalencies)
         return new_array.view(self.dtype).reshape(self.shape)
 
+
+class MoonLocationAttribute(Attribute):
+    """
+    A frame attribute that can act as a `~lunarsky.MoonLocation`.
+    It can be created as anything that can be transformed to the
+    `~lunarsky.MCMF` frame, but always presents as an `MoonLocation`
+    when accessed after creation.
+
+    Parameters
+    ----------
+    default : object
+        Default value for the attribute if not provided
+    secondary_attribute : str
+        Name of a secondary instance attribute which supplies the value if
+        ``default is None`` and no value was supplied during initialization.
+    """
+
+    def convert_input(self, value):
+        """
+        Checks that the input is a Quantity with the necessary units (or the
+        special value ``0``).
+
+        Parameters
+        ----------
+        value : object
+            Input value to be converted.
+
+        Returns
+        -------
+        out, converted : correctly-typed object, boolean
+            Tuple consisting of the correctly-typed object and a boolean which
+            indicates if conversion was actually performed.
+
+        Raises
+        ------
+        ValueError
+            If the input is not valid for this attribute.
+        """
+
+        if value is None:
+            return None, False
+        elif isinstance(value, MoonLocation):
+            return value, False
+        else:
+            # we have to do the import here because of some tricky circular deps
+            from . import MCMF
+
+            if not hasattr(value, 'transform_to'):
+                raise ValueError('"{}" was passed into an '
+                                 'MoonLocationAttribute, but it does not have '
+                                 '"transform_to" method'.format(value))
+            mcmfobj = value.transform_to(MCMF)
+            return mcmfobj.moon_location, True
