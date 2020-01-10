@@ -88,6 +88,7 @@ class LunarTopo(BaseCoordinateFrame):
 def _spice_setup(latitude, longitude):
     if not check_is_loaded('*LUNAR-TOPO*'):
         station_name, idnum, frame_specs = topo_frame_def(latitude, longitude, moon=True)
+        frame_strs = ["{}={}".format(k,v) for (k,v) in frame_specs.values()]
         spice.lmpool(frame_specs)
 
 

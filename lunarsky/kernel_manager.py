@@ -7,7 +7,6 @@ import spiceypy as spice
 
 _naif_kernel_url = 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels'
 
-
 def check_is_loaded(search):
     """
     Search the kernel pool variable names for a given string.
@@ -36,7 +35,7 @@ def download_kernels(furnish=True):
     return kernel_paths
 
 
-def topo_frame_def(latitude, longitude, moon=False):
+def topo_frame_def(latitude, longitude, moon=True):
     """
     Make a list of strings defining a topocentric frame. This can then be loaded
     with spiceypy.lmpool.
@@ -57,10 +56,8 @@ def topo_frame_def(latitude, longitude, moon=False):
     idnum += station_num
     fm_center_id = idnum - 1000000
 
-#    ecef_to_enu = Rotation.from_euler('zyx', [-longitude, latitude, 0], degrees=True).as_matrix()
     ecef_to_enu = np.matmul(rotation_matrix(-longitude, 'z', unit='deg'), rotation_matrix(latitude, 'y', unit='deg')).T
-
-#    # This reorders the axes to match the XYZ axes of the enu frame.
+    # Reorder the axes so that X,Y,Z = E,N,U
     ecef_to_enu = ecef_to_enu[[2, 1, 0]]
 
 
@@ -77,9 +74,16 @@ def topo_frame_def(latitude, longitude, moon=False):
             "TKFRAME_{0}_SPEC              = 'MATRIX'",
             "TKFRAME_{0}_MATRIX            = {4}"
         ]
+
     frame_specs = [s.format(idnum, station_name, fm_center_id, relative, mat) for s in fmt_strs]
 
-    return station_name, idnum, frame_specs
+    frame_dict = {}
+
+    for spec in frame_specs:
+        k, v = map(str.strip, spec.split('='))
+        frame_dict[k] = v
+
+    return station_name, idnum, frame_dict
 
 
 def cleanup():
