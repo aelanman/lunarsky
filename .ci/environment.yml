@@ -1,0 +1,12 @@
+name: lunarsky 
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - numpy>=1.15
+  - spiceypy
+  - astropy
+  - pytest
+  - pytest-runner
+  - pytest-cov
+  - flake8
