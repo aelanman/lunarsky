@@ -61,7 +61,7 @@ def icrs_to_mcmf(icrs_coo, mcmf_frame):
     mat = icrs_to_mcmf_mat(mcmf_frame.obstime)
     newrepr = icrs_coo.cartesian.transform(mat)
 
-    return mcmf_frame.realize_frame(newrepr, obstime=mcmf_frame.obstime)
+    return mcmf_frame.realize_frame(newrepr)
 
 
 @frame_transform_graph.transform(FunctionTransformWithFiniteDifference, MCMF, ICRS)

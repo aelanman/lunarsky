@@ -20,6 +20,7 @@ _90DEG = 90 * deg
 __all__ = ['LunarTopo']
 
 _J2000 = Time("J2000")
+DEFAULT_OBSTIME = Time('J2000', scale='tt')
 
 doc_components = """
     az : `~astropy.coordinates.Angle`, optional, must be keyword
@@ -61,7 +62,7 @@ class LunarTopo(BaseCoordinateFrame):
     default_representation = SphericalRepresentation
     default_differential = SphericalCosLatDifferential
 
-    obstime = TimeAttribute(default=None)
+    obstime = TimeAttribute(default=DEFAULT_OBSTIME)
     location = MoonLocationAttribute(default=None)
 
     def __init__(self, *args, **kwargs):
@@ -88,8 +89,8 @@ class LunarTopo(BaseCoordinateFrame):
 def _spice_setup(latitude, longitude):
     if not check_is_loaded('*LUNAR-TOPO*'):
         station_name, idnum, frame_specs = topo_frame_def(latitude, longitude, moon=True)
-        frame_strs = ["{}={}".format(k,v) for (k,v) in frame_specs.values()]
-        spice.lmpool(frame_specs)
+        frame_strs = ["{}={}".format(k,v) for (k,v) in frame_specs.items()]
+        spice.lmpool(frame_strs)
 
 
 @frame_transform_graph.transform(FunctionTransformWithFiniteDifference, ICRS, LunarTopo)
@@ -97,7 +98,8 @@ def icrs_to_lunartopo(icrs_coo, topo_frame):
 
     _spice_setup(topo_frame.location.lat.deg, topo_frame.location.lon.deg)
 
-    et = (topo_frame.obstime - _J2000).sec
+    obstime = topo_frame.obstime
+    et = (obstime - _J2000).sec
     mat = spice.pxform('J2000', 'LUNAR-TOPO', et)
     newrepr = icrs_coo.cartesian.transform(mat)
 
@@ -109,7 +111,8 @@ def lunartopo_to_icrs(topo_coo, icrs_frame):
 
     _spice_setup(topo_coo.location.lat.deg, topo_coo.location.lon.deg)
 
-    et = (topo_coo.obstime - _J2000).sec
+    obstime = topo_coo.obstime
+    et = (obstime - _J2000).sec
     mat = spice.pxform('LUNAR-TOPO', 'J2000', et)
     newrepr = topo_coo.cartesian.transform(mat)
 
@@ -121,7 +124,9 @@ def mcmf_to_lunartopo(mcmf_coo, topo_frame):
 
     _spice_setup(topo_frame.location.lat.deg, topo_frame.location.lon.deg)
 
-    mat = spice.pxform('MOON_ME', 'LUNAR-TOPO', 0)
+    obstime = topo_frame.obstime
+    et = (obstime - _J2000).sec
+    mat = spice.pxform('MOON_ME', 'LUNAR-TOPO', et)
     newrepr = mcmf_coo.cartesian.transform(mat)
 
     return topo_frame.realize_frame(newrepr)
