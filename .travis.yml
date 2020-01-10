@@ -38,6 +38,4 @@ script:
   - python -m pytest lunarsky --cov=lunarsky --cov-config=.coveragerc --cov-report xml:./coverage.xml --cov-report term
 
 after_success:
-  - coveralls
-notifications:
-  webhooks: https://coveralls.io/webhook?repo_token=$COVERALLS_REPO_TOKEN
+  - codecov --token=$CODECOV_TOKEN
