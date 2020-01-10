@@ -4,10 +4,6 @@ language: python
 python:
   # We don't actually use the Travis Python, but this keeps it organized.
   - "3.6"
-  - '3.7'
-env:
-  global:
-    - COVERALLS_PARALLEL=true
 install:
   - sudo apt-get update
   # We do this conditionally because it saves us some downloading if the
@@ -31,9 +27,8 @@ install:
 
 script:
     # Using astropy's formatting requirements
-    # Check formatting first, since it's faster than tests.
-  - flake8 lunarsky --count --select=E101,W191,W291,W292,W293,W391,E111,E112,E113,E30,E502,E722,E901,E902,E999,F822,F823
   - python -m pytest lunarsky --cov=lunarsky --cov-config=.coveragerc --cov-report xml:./coverage.xml --cov-report term
+  - flake8 lunarsky --count --select=E101,W191,W291,W292,W293,W391,E111,E112,E113,E30,E502,E722,E901,E902,E999,F822,F823
 
 after_success:
   - codecov --token=$CODECOV_TOKEN

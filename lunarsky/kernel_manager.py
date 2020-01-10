@@ -7,6 +7,7 @@ import spiceypy as spice
 
 _naif_kernel_url = 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels'
 
+
 def check_is_loaded(search):
     """
     Search the kernel pool variable names for a given string.
@@ -60,20 +61,19 @@ def topo_frame_def(latitude, longitude, moon=True):
     # Reorder the axes so that X,Y,Z = E,N,U
     ecef_to_enu = ecef_to_enu[[2, 1, 0]]
 
-
     mat = " ".join(map("{:.7f}".format, ecef_to_enu.flatten()))
 
     fmt_strs = [
-            "FRAME_{1}                     = {0}",
-            "FRAME_{0}_NAME                = '{1}'",
-            "FRAME_{0}_CLASS                   = 4",
-            "FRAME_{0}_CLASS_ID                = {0}",
-            "FRAME_{0}_CENTER                  = {2}",
-            "OBJECT_{2}_FRAME                   = '{1}'",
-            "TKFRAME_{0}_RELATIVE          = '{3}'",
-            "TKFRAME_{0}_SPEC              = 'MATRIX'",
-            "TKFRAME_{0}_MATRIX            = {4}"
-        ]
+        "FRAME_{1}                     = {0}",
+        "FRAME_{0}_NAME                = '{1}'",
+        "FRAME_{0}_CLASS                   = 4",
+        "FRAME_{0}_CLASS_ID                = {0}",
+        "FRAME_{0}_CENTER                  = {2}",
+        "OBJECT_{2}_FRAME                   = '{1}'",
+        "TKFRAME_{0}_RELATIVE          = '{3}'",
+        "TKFRAME_{0}_SPEC              = 'MATRIX'",
+        "TKFRAME_{0}_MATRIX            = {4}"
+    ]
 
     frame_specs = [s.format(idnum, station_name, fm_center_id, relative, mat) for s in fmt_strs]
 
