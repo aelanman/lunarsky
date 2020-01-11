@@ -7,6 +7,4 @@ def representation_deprecation_to_error():
     warnings.filterwarnings('ignore', message='Using or importing the ABCs from'
                                               '\'collections\' instead of from'
                                               '\'collections.abc\' is deprecated'
-                                              
                                     , category=DeprecationWarning)
-

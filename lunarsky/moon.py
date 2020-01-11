@@ -112,15 +112,15 @@ class MoonLocation(u.Quantity):
                 isinstance(args[0], MoonLocation)):
             return args[0].copy()
         try:
-            self = cls.from_selenodetic(*args, **kwargs)
-        except (u.UnitsError, TypeError) as exc_geocentric:
+            self = cls.from_selenocentric(*args, **kwargs)
+        except (u.UnitsError, TypeError) as exc_selenocentric:
             try:
                 self = cls.from_selenodetic(*args, **kwargs)
             except Exception as exc_selenodetic:
                 raise TypeError('Coordinates could not be parsed as either '
                                 'selenocentric or selenodetic, with respective '
                                 'exceptions "{}" and "{}"'
-                                .format(exc_geocentric, exc_selenodetic))
+                                .format(exc_selenocentric, exc_selenodetic))
         return self
 
     @classmethod
@@ -240,6 +240,9 @@ class MoonLocation(u.Quantity):
     def to_selenodetic(self):
         """Convert to selenodetic coordinates (lat, lon, height).
 
+        Height is in reference to a sphere with radius `_lunar_radius`,
+        centered at the center of mass.
+
         Returns
         -------
         (lon, lat, height) : tuple
@@ -249,9 +252,10 @@ class MoonLocation(u.Quantity):
         """
         self_xyz = self.to(u.meter).view(self._array_dtype, np.ndarray)
         self_xyz = np.atleast_2d(self_xyz)
-        lat = np.arctan(self_xyz[:, 2])
+        gps_p = np.sqrt(self_xyz[:, 0]**2 + self_xyz[:, 1]**2)
+        lat = np.arctan2(self_xyz[:, 2], gps_p)
         lon = np.arctan2(self_xyz[:, 1], self_xyz[:, 0])
-        height = self._lunar_radius - np.linalg.norm(self_xyz, axis=1)
+        height = np.linalg.norm(self_xyz, axis=1) - self._lunar_radius
 
         return GeodeticLocation(
             Longitude(lon * u.radian, u.degree,
@@ -398,7 +402,7 @@ class MoonLocationAttribute(Attribute):
             from . import MCMF
 
             if not hasattr(value, 'transform_to'):
-                raise ValueError('"{}" was passed into an '
+                raise ValueError('"{}" was passed into a '
                                  'MoonLocationAttribute, but it does not have '
                                  '"transform_to" method'.format(value))
             mcmfobj = value.transform_to(MCMF)

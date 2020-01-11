@@ -32,3 +32,20 @@ def test_icrs_to_mcmf(time, lat, lon):
     mcmf = stars.transform_to(lunarsky.MCMF(obstime=time))
     topo1 = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
     assert ltests.positions_close(topo0, topo1, ascoord.Angle(10.0, 'arcsec'))
+
+
+@pytest.mark.parametrize('time', times)
+@pytest.mark.parametrize('lat,lon', latlons)
+def test_topo_transform_loop(time, lat, lon):
+    # Testing remaining transformations
+    height = 10.0     # m
+    stars = ltests.get_catalog()
+    loc = lunarsky.MoonLocation.from_selenodetic(lon, lat, height)
+
+    topo0 = stars.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
+    icrs0 = topo0.transform_to(ascoord.ICRS)
+    assert ltests.positions_close(stars, icrs0, ascoord.Angle(5.0, 'arcsec'))
+
+    mcmf0 = topo0.transform_to(lunarsky.MCMF(obstime=time))
+    mcmf1 = stars.transform_to(lunarsky.MCMF(obstime=time))
+    assert ltests.positions_close(mcmf0, mcmf1, ascoord.Angle(5.0, 'arcsec'))

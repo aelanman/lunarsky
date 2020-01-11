@@ -37,7 +37,7 @@ class MCMF(BaseCoordinateFrame):
         """
         The data in this frame as an `~astropy.coordinates.MoonLocation` class.
         """
-        from astropy.coordinates.moon import MoonLocation
+        from .moon import MoonLocation
 
         cart = self.represent_as(CartesianRepresentation)
         return MoonLocation(x=cart.x, y=cart.y, z=cart.z)
