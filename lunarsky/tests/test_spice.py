@@ -6,7 +6,7 @@ from astropy.coordinates import AltAz, ICRS, EarthLocation, Angle
 from astropy.utils.data import download_files_in_parallel
 import lunarsky
 import lunarsky.tests as ltests
-import lunarsky.kernel_manager as kernel_manager
+import lunarsky.spice_utils as spice_utils
 
 
 import spiceypy as spice
@@ -16,7 +16,7 @@ def test_topo_frame_setup():
     # Check that the frame setup puts all the correct values in the kernel pool.
 
     latitude, longitude = 30, 25
-    name, idnum, frame_dict = kernel_manager.topo_frame_def(latitude, longitude)
+    name, idnum, frame_dict = spice_utils.topo_frame_def(latitude, longitude)
     frame_strs = ["{}={}".format(k, v) for (k, v) in frame_dict.items()]
     spice.lmpool(frame_strs)
 
@@ -43,7 +43,7 @@ def test_kernel_paths():
     # Check that the correct kernel files are downloaded
     # Need to unhash the file names
 
-    assert len(lunarsky.kernel_manager.KERNEL_PATHS) == 3
+    assert len(lunarsky.spice_utils.KERNEL_PATHS) == 3
 
 
 def test_spice_earth():
@@ -63,11 +63,11 @@ def test_spice_earth():
     assert steps == 2
 
     # Make the Earth topo frame in spice.
-    framename, idnum, frame_dict = lunarsky.kernel_manager.topo_frame_def(lat, lon, moon=False)
+    framename, idnum, frame_dict = lunarsky.spice_utils.topo_frame_def(lat, lon, moon=False)
 
     # One more kernel is needed for the ITRF93 frame.
     kname = 'pck/earth_latest_high_prec.bpc'
-    kurl = [lunarsky.kernel_manager._naif_kernel_url + '/' + kname]
+    kurl = [lunarsky.spice_utils._naif_kernel_url + '/' + kname]
     kernpath = download_files_in_parallel(kurl, cache=True, show_progress=False, pkgname='lunarsky')
     spice.furnsh(kernpath)
 
@@ -101,11 +101,11 @@ def test_topo_kernel_setup():
 
     spice.clpool()
     # Confirm no variables are loaded.
-    assert not lunarsky.kernel_manager.check_is_loaded("*")
+    assert not lunarsky.spice_utils.check_is_loaded("*")
 
-    for filepath in lunarsky.kernel_manager.KERNEL_PATHS:
+    for filepath in lunarsky.spice_utils.KERNEL_PATHS:
         spice.furnsh(filepath)
     lat, lon = 30, 20
     lunarsky.topo._spice_setup(lat, lon)
-    station_name, idnum, frame_specs = lunarsky.kernel_manager.topo_frame_def(lat, lon, moon=True)
-    assert lunarsky.kernel_manager.check_is_loaded('*{}*'.format(idnum))
+    station_name, idnum, frame_specs = lunarsky.spice_utils.topo_frame_def(lat, lon, moon=True)
+    assert lunarsky.spice_utils.check_is_loaded('*{}*'.format(idnum))

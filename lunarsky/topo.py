@@ -11,7 +11,7 @@ from astropy.coordinates.builtin_frames.icrs import ICRS
 
 from .mcmf import MCMF
 from .moon import MoonLocationAttribute
-from .kernel_manager import check_is_loaded, topo_frame_def
+from .spice_utils import check_is_loaded, topo_frame_def
 
 import spiceypy as spice
 
