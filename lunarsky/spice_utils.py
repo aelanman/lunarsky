@@ -1,9 +1,14 @@
 
 import numpy as np
-from astropy.utils.data import download_files_in_parallel
+from astropy.utils.data import download_files_in_parallel, get_cached_urls, download_file
+from astropy.coordinates.solar_system import solar_system_ephemeris
 from astropy.coordinates.matrix_utilities import rotation_matrix
+from astropy.time import Time
+import astropy.units as unit
 
 import spiceypy as spice
+
+from .mcmf import MCMF
 
 _naif_kernel_url = 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels'
 
@@ -84,6 +89,24 @@ def topo_frame_def(latitude, longitude, moon=True):
         frame_dict[k] = v
 
     return station_name, idnum, frame_dict
+
+
+def earth_pos_mcmf(obstime):
+    """
+    Get the position of the Earth in the MCMF frame.
+
+    Used for tests.
+    """
+    solar_system_ephemeris.set('jpl')
+    spkurls = [url for url in get_cached_urls() if 'spk' in url]
+    for url in spkurls:
+        # Roundabout way to get the path of the cached spk file.
+        fpath = download_file(url, cache=True, show_progress=False)
+        spice.furnsh(fpath)
+    et = (obstime - Time("J2000")).sec
+    earthpos, ltt = spice.spkpos('earth', et, 'MOON_ME', 'None', 'moon')
+    earthpos = unit.Quantity(earthpos, 'km')
+    return MCMF(*earthpos, obstime=obstime)
 
 
 def cleanup():

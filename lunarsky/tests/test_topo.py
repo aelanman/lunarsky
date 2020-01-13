@@ -1,5 +1,5 @@
 
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 import astropy.coordinates as ascoord
 import lunarsky
 import lunarsky.tests as ltests
@@ -48,3 +48,32 @@ def test_topo_transform_loop(time, lat, lon):
     mcmf0 = topo0.transform_to(lunarsky.MCMF(obstime=time))
     mcmf1 = stars.transform_to(lunarsky.MCMF(obstime=time))
     assert ltests.positions_close(mcmf0, mcmf1, ascoord.Angle(5.0, 'arcsec'))
+
+
+def test_earth_from_moon():
+    # Look at the position of the Earth from the Moon over time.
+    Ntimes = 100
+    ets = np.linspace(0, 4 * 28 * 24 * 3600., Ntimes)    # Four months
+    times_jd = Time.now() + TimeDelta(ets, format='sec')
+
+    lat, lon = 0, 0  # deg
+    loc = lunarsky.MoonLocation.from_selenodetic(lat, lon)
+    zaaz_deg = np.zeros((Ntimes, 2))
+    for ti, tim in enumerate(times_jd):
+        mcmf = lunarsky.spice_utils.earth_pos_mcmf(tim)
+        top = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=tim))
+        zaaz_deg[ti, :] = [top.zen.deg, top.az.deg]
+
+    assert np.all(zaaz_deg[:, 0] < 10)  # All zenith angles should be less than 10 degrees
+
+    # Check that the periodicity of the Earth's motion around the zenith
+    # is consistent with the Moon's orbit.
+    moonfreq = 1 / (28. * 24. * 3600.)    # Hz, frequency of the moon's orbit
+    _az = np.fft.fft(zaaz_deg[:, 1])
+    ks = np.fft.fftfreq(Ntimes, d=np.diff(ets)[0])
+    sel = ks > 0
+
+    closest = np.argmin(np.abs(moonfreq - ks[sel]))
+    peakloc = np.argmax(np.abs(_az[sel]))
+
+    assert peakloc == closest
