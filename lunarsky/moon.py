@@ -430,8 +430,3 @@ class MoonLocationAttribute(Attribute):
                                  '"transform_to" method'.format(value))
             mcmfobj = value.transform_to(MCMF)
             return mcmfobj.moon_location, True
-
-    def __set__(self, instance, val):
-        # Override the super() method, which doesn't
-        # allow assignment
-        setattr(instance, '_' + self.name, val)
