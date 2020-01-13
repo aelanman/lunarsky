@@ -1,11 +1,11 @@
 
 from astropy.utils.decorators import format_doc
 from astropy.coordinates.representation import SphericalRepresentation, SphericalCosLatDifferential
-from astropy.coordinates.baseframe import BaseCoordinateFrame, base_doc
+from astropy.coordinates.baseframe import BaseCoordinateFrame, base_doc, frame_transform_graph
 from astropy.coordinates.attributes import TimeAttribute
 from astropy.time import Time
 from astropy.units import deg
-from astropy.coordinates.baseframe import frame_transform_graph, RepresentationMapping
+from astropy.coordinates.baseframe import RepresentationMapping
 from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
 from astropy.coordinates.builtin_frames.icrs import ICRS
 
@@ -67,14 +67,6 @@ class LunarTopo(BaseCoordinateFrame):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-    @property
-    def secz(self):
-        """
-        Secant if the zenith angle for this coordinate, a common estimate of the
-        airmass.
-        """
-        return 1/np.sin(self.alt)
 
     @property
     def zen(self):

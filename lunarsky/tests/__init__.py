@@ -1,6 +1,7 @@
 
 import numpy as np
-from astropy.coordinates import SkyCoord, Angle
+from lunarsky import SkyCoord
+from astropy.coordinates import Angle
 import pytest
 
 

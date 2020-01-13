@@ -41,9 +41,8 @@ def test_topo_transform_loop(time, lat, lon):
     height = 10.0     # m
     stars = ltests.get_catalog()
     loc = lunarsky.MoonLocation.from_selenodetic(lon, lat, height)
-
     topo0 = stars.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
-    icrs0 = topo0.transform_to(ascoord.ICRS)
+    icrs0 = topo0.transform_to(ascoord.ICRS())
     assert ltests.positions_close(stars, icrs0, ascoord.Angle(5.0, 'arcsec'))
 
     mcmf0 = topo0.transform_to(lunarsky.MCMF(obstime=time))

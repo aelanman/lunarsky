@@ -4,7 +4,7 @@ import numpy as np
 from astropy import units as u
 from astropy.units.quantity import QuantityInfoBase
 from astropy.coordinates.angles import Longitude, Latitude
-from astropy.coordinates.earth import GeodeticLocation
+from astropy.coordinates.earth import GeodeticLocation, EarthLocation
 from astropy.coordinates.attributes import Attribute
 
 __all__ = ['MoonLocation', 'MoonLocationAttribute']
@@ -312,6 +312,29 @@ class MoonLocation(u.Quantity):
                                      for the location of this object at the
                                      default ``obstime``.""")
 
+    def get_mcmf_posvel(self, obstime):
+        """
+        Calculate the MCMF position and velocity of this object at the
+        requested ``obstime``.
+
+        Parameters
+        ----------
+        obstime : `~astropy.time.Time`
+            The ``obstime`` to calculate the GCRS position/velocity at.
+
+        Returns
+        --------
+        obsgeoloc : `~astropy.coordinates.CartesianRepresentation`
+            The GCRS position of the object
+        obsgeovel : `~astropy.coordinates.CartesianRepresentation`
+            The GCRS velocity of the object
+        """
+        # MCMF position
+        mcmf_data = self.get_mcmf(obstime).data
+        obspos = mcmf_data.without_differentials()
+        obsvel = mcmf_data.differentials['s'].to_cartesian()
+        return obspos, obsvel
+
     @property
     def x(self):
         """The X component of the selenocentric coordinates."""
@@ -407,3 +430,8 @@ class MoonLocationAttribute(Attribute):
                                  '"transform_to" method'.format(value))
             mcmfobj = value.transform_to(MCMF)
             return mcmfobj.moon_location, True
+
+    def __set__(self, instance, val):
+        # Override the super() method, which doesn't
+        # allow assignment
+        setattr(instance, '_' + self.name, val)
