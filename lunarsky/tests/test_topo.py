@@ -56,11 +56,20 @@ def test_earth_from_moon():
     ets = np.linspace(0, 4 * 28 * 24 * 3600., Ntimes)    # Four months
     times_jd = Time.now() + TimeDelta(ets, format='sec')
 
+    # Minimum and maximum, respectively, over the year.
+    # The lunar apogee nad perigee vary over time. These are
+    # chosen from a table of minimum/maxmium perigees over a century.
+    # http://astropixels.com/ephemeris/moon/moonperap2001.html
+    lunar_perigee = 356425.0    # km, Dec 6 2052
+    lunar_apogee = 406709.0     # km, Dec 12 2061
+
     lat, lon = 0, 0  # deg
     loc = lunarsky.MoonLocation.from_selenodetic(lat, lon)
     zaaz_deg = np.zeros((Ntimes, 2))
     for ti, tim in enumerate(times_jd):
         mcmf = lunarsky.spice_utils.earth_pos_mcmf(tim)
+        dist = np.linalg.norm(mcmf.cartesian.xyz.to('km').value)
+        assert lunar_perigee < dist < lunar_apogee
         top = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=tim))
         zaaz_deg[ti, :] = [top.zen.deg, top.az.deg]
 
@@ -75,5 +84,4 @@ def test_earth_from_moon():
 
     closest = np.argmin(np.abs(moonfreq - ks[sel]))
     peakloc = np.argmax(np.abs(_az[sel]))
-
     assert peakloc == closest
