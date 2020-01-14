@@ -6,6 +6,7 @@ dependencies:
   - numpy>=1.15
   - spiceypy
   - astropy
+  - jplephem
   - pytest
   - pytest-runner
   - pytest-cov
