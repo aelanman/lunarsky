@@ -1,6 +1,8 @@
 
 import numpy as np
-from astropy.coordinates import SkyCoord, Angle
+from lunarsky import SkyCoord
+from astropy.coordinates import Angle
+import pytest
 
 
 def get_catalog():
@@ -27,5 +29,23 @@ def positions_close(fr0, fr1, tol):
     # Floating errors may push some dot products to be larger than 1.
     # Check these are within floating precision of 1.
     check_inv = np.isclose(np.abs(dots[invalid]), 1.0)
-    dev_angs = Angle(np.arccos(dots), 'rad')
-    return np.all(dev_angs[~invalid] < tol) and np.all(check_inv)
+    dev_angs = Angle(np.arccos(dots[~invalid]), 'rad')
+    return np.all(dev_angs < tol) and np.all(check_inv)
+
+
+def assert_raises_message(exception_type, message, func, *args, **kwargs):
+    """
+    Check that the correct error message is raised.
+    """
+    nocatch = kwargs.pop('nocatch', False)
+    if nocatch:
+        func(*args, **kwargs)
+
+    with pytest.raises(exception_type) as err:
+        func(*args, **kwargs)
+
+    try:
+        assert message in str(err.value)
+    except AssertionError as excp:
+        print("{} not in {}".format(message, str(err.value)))
+        raise excp

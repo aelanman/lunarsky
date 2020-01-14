@@ -1,11 +1,10 @@
 
 from astropy.utils.decorators import format_doc
 from astropy.coordinates.representation import CartesianRepresentation, CartesianDifferential
-from astropy.coordinates.baseframe import BaseCoordinateFrame, base_doc
+from astropy.coordinates.baseframe import BaseCoordinateFrame, base_doc, frame_transform_graph
 from astropy.coordinates.attributes import TimeAttribute
 from astropy.time import Time
 
-from astropy.coordinates.baseframe import frame_transform_graph
 from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
 from astropy.coordinates.matrix_utilities import matrix_transpose
 from astropy.coordinates.builtin_frames.icrs import ICRS
@@ -37,7 +36,7 @@ class MCMF(BaseCoordinateFrame):
         """
         The data in this frame as an `~astropy.coordinates.MoonLocation` class.
         """
-        from astropy.coordinates.moon import MoonLocation
+        from .moon import MoonLocation
 
         cart = self.represent_as(CartesianRepresentation)
         return MoonLocation(x=cart.x, y=cart.y, z=cart.z)

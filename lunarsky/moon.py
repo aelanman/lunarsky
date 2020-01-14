@@ -4,7 +4,7 @@ import numpy as np
 from astropy import units as u
 from astropy.units.quantity import QuantityInfoBase
 from astropy.coordinates.angles import Longitude, Latitude
-from astropy.coordinates.earth import GeodeticLocation
+from astropy.coordinates.earth import GeodeticLocation, EarthLocation
 from astropy.coordinates.attributes import Attribute
 
 __all__ = ['MoonLocation', 'MoonLocationAttribute']
@@ -112,15 +112,15 @@ class MoonLocation(u.Quantity):
                 isinstance(args[0], MoonLocation)):
             return args[0].copy()
         try:
-            self = cls.from_selenodetic(*args, **kwargs)
-        except (u.UnitsError, TypeError) as exc_geocentric:
+            self = cls.from_selenocentric(*args, **kwargs)
+        except (u.UnitsError, TypeError) as exc_selenocentric:
             try:
                 self = cls.from_selenodetic(*args, **kwargs)
             except Exception as exc_selenodetic:
                 raise TypeError('Coordinates could not be parsed as either '
                                 'selenocentric or selenodetic, with respective '
                                 'exceptions "{}" and "{}"'
-                                .format(exc_geocentric, exc_selenodetic))
+                                .format(exc_selenocentric, exc_selenodetic))
         return self
 
     @classmethod
@@ -240,6 +240,9 @@ class MoonLocation(u.Quantity):
     def to_selenodetic(self):
         """Convert to selenodetic coordinates (lat, lon, height).
 
+        Height is in reference to a sphere with radius `_lunar_radius`,
+        centered at the center of mass.
+
         Returns
         -------
         (lon, lat, height) : tuple
@@ -249,9 +252,10 @@ class MoonLocation(u.Quantity):
         """
         self_xyz = self.to(u.meter).view(self._array_dtype, np.ndarray)
         self_xyz = np.atleast_2d(self_xyz)
-        lat = np.arctan(self_xyz[:, 2])
+        gps_p = np.sqrt(self_xyz[:, 0]**2 + self_xyz[:, 1]**2)
+        lat = np.arctan2(self_xyz[:, 2], gps_p)
         lon = np.arctan2(self_xyz[:, 1], self_xyz[:, 0])
-        height = self._lunar_radius - np.linalg.norm(self_xyz, axis=1)
+        height = np.linalg.norm(self_xyz, axis=1) - self._lunar_radius
 
         return GeodeticLocation(
             Longitude(lon * u.radian, u.degree,
@@ -307,6 +311,29 @@ class MoonLocation(u.Quantity):
     mcmf = property(get_mcmf, doc="""An `~astropy.coordinates.MCMF` object  with
                                      for the location of this object at the
                                      default ``obstime``.""")
+
+    def get_mcmf_posvel(self, obstime):
+        """
+        Calculate the MCMF position and velocity of this object at the
+        requested ``obstime``.
+
+        Parameters
+        ----------
+        obstime : `~astropy.time.Time`
+            The ``obstime`` to calculate the GCRS position/velocity at.
+
+        Returns
+        --------
+        obsgeoloc : `~astropy.coordinates.CartesianRepresentation`
+            The GCRS position of the object
+        obsgeovel : `~astropy.coordinates.CartesianRepresentation`
+            The GCRS velocity of the object
+        """
+        # MCMF position
+        mcmf_data = self.get_mcmf(obstime).data
+        obspos = mcmf_data.without_differentials()
+        obsvel = mcmf_data.differentials['s'].to_cartesian()
+        return obspos, obsvel
 
     @property
     def x(self):
@@ -398,7 +425,7 @@ class MoonLocationAttribute(Attribute):
             from . import MCMF
 
             if not hasattr(value, 'transform_to'):
-                raise ValueError('"{}" was passed into an '
+                raise ValueError('"{}" was passed into a '
                                  'MoonLocationAttribute, but it does not have '
                                  '"transform_to" method'.format(value))
             mcmfobj = value.transform_to(MCMF)

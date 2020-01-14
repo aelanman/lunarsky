@@ -1,17 +1,17 @@
 
 from astropy.utils.decorators import format_doc
 from astropy.coordinates.representation import SphericalRepresentation, SphericalCosLatDifferential
-from astropy.coordinates.baseframe import BaseCoordinateFrame, base_doc
+from astropy.coordinates.baseframe import BaseCoordinateFrame, base_doc, frame_transform_graph
 from astropy.coordinates.attributes import TimeAttribute
 from astropy.time import Time
 from astropy.units import deg
-from astropy.coordinates.baseframe import frame_transform_graph, RepresentationMapping
+from astropy.coordinates.baseframe import RepresentationMapping
 from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
 from astropy.coordinates.builtin_frames.icrs import ICRS
 
 from .mcmf import MCMF
 from .moon import MoonLocationAttribute
-from .kernel_manager import check_is_loaded, topo_frame_def
+from .spice_utils import check_is_loaded, topo_frame_def
 
 import spiceypy as spice
 
@@ -69,14 +69,6 @@ class LunarTopo(BaseCoordinateFrame):
         super().__init__(*args, **kwargs)
 
     @property
-    def secz(self):
-        """
-        Secant if the zenith angle for this coordinate, a common estimate of the
-        airmass.
-        """
-        return 1/np.sin(self.alt)
-
-    @property
     def zen(self):
         """
         The zenith angle for this coordinate
@@ -87,8 +79,19 @@ class LunarTopo(BaseCoordinateFrame):
 # Transformations
 
 def _spice_setup(latitude, longitude):
-    if not check_is_loaded('*LUNAR-TOPO*'):
-        station_name, idnum, frame_specs = topo_frame_def(latitude, longitude, moon=True)
+    if not isinstance(latitude, (int, float)):
+        latitude = latitude[0]
+    if not isinstance(longitude, (int, float)):
+        longitude = longitude[0]
+
+    loadnew = True
+    frameloaded = check_is_loaded('*LUNAR-TOPO*')
+    if frameloaded:
+        latlon = spice.gcpool('TOPO_LAT_LON', 0, 8)
+        loadnew = not latlon == ["{:.4f}".format(l) for l in [latitude, longitude]]
+    if loadnew:
+        station_name, idnum, frame_specs, latlon = topo_frame_def(latitude, longitude, moon=True)
+        spice.pcpool('TOPO_LAT_LON', latlon)
         frame_strs = ["{}={}".format(k,v) for (k,v) in frame_specs.items()]
         spice.lmpool(frame_strs)
 
