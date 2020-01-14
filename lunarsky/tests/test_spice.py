@@ -16,7 +16,7 @@ def test_topo_frame_setup():
     # Check that the frame setup puts all the correct values in the kernel pool.
 
     latitude, longitude = 30, 25
-    name, idnum, frame_dict = spice_utils.topo_frame_def(latitude, longitude)
+    name, idnum, frame_dict, latlon = spice_utils.topo_frame_def(latitude, longitude)
     frame_strs = ["{}={}".format(k, v) for (k, v) in frame_dict.items()]
     spice.lmpool(frame_strs)
 
@@ -63,7 +63,7 @@ def test_spice_earth():
     assert steps == 2
 
     # Make the Earth topo frame in spice.
-    framename, idnum, frame_dict = lunarsky.spice_utils.topo_frame_def(lat, lon, moon=False)
+    framename, idnum, frame_dict, latlon = lunarsky.spice_utils.topo_frame_def(lat, lon, moon=False)
 
     # One more kernel is needed for the ITRF93 frame.
     kname = 'pck/earth_latest_high_prec.bpc'
@@ -107,5 +107,5 @@ def test_topo_kernel_setup():
         spice.furnsh(filepath)
     lat, lon = 30, 20
     lunarsky.topo._spice_setup(lat, lon)
-    station_name, idnum, frame_specs = lunarsky.spice_utils.topo_frame_def(lat, lon, moon=True)
+    station_name, idnum, frame_specs, latlon = lunarsky.spice_utils.topo_frame_def(lat, lon, moon=True)
     assert lunarsky.spice_utils.check_is_loaded('*{}*'.format(idnum))

@@ -79,8 +79,19 @@ class LunarTopo(BaseCoordinateFrame):
 # Transformations
 
 def _spice_setup(latitude, longitude):
-    if not check_is_loaded('*LUNAR-TOPO*'):
-        station_name, idnum, frame_specs = topo_frame_def(latitude, longitude, moon=True)
+    if not isinstance(latitude, (int, float)):
+        latitude = latitude[0]
+    if not isinstance(longitude, (int, float)):
+        longitude = longitude[0]
+
+    loadnew = True
+    frameloaded = check_is_loaded('*LUNAR-TOPO*')
+    if frameloaded:
+        latlon = spice.gcpool('TOPO_LAT_LON', 0, 8)
+        loadnew = not latlon == ["{:.4f}".format(l) for l in [latitude, longitude]]
+    if loadnew:
+        station_name, idnum, frame_specs, latlon = topo_frame_def(latitude, longitude, moon=True)
+        spice.pcpool('TOPO_LAT_LON', latlon)
         frame_strs = ["{}={}".format(k,v) for (k,v) in frame_specs.items()]
         spice.lmpool(frame_strs)
 

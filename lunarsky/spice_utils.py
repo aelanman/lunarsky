@@ -88,7 +88,9 @@ def topo_frame_def(latitude, longitude, moon=True):
         k, v = map(str.strip, spec.split('='))
         frame_dict[k] = v
 
-    return station_name, idnum, frame_dict
+    latlon = ["{:.4f}".format(l) for l in [latitude, longitude]]
+
+    return station_name, idnum, frame_dict, latlon
 
 
 def earth_pos_mcmf(obstime):
@@ -103,6 +105,7 @@ def earth_pos_mcmf(obstime):
         # Roundabout way to get the path of the cached spk file.
         fpath = download_file(url, cache=True, show_progress=False)
         spice.furnsh(fpath)
+        print(url, fpath)
     et = (obstime - Time("J2000")).sec
     earthpos, ltt = spice.spkpos('earth', et, 'MOON_ME', 'None', 'moon')
     earthpos = unit.Quantity(earthpos, 'km')

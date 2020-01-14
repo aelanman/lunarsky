@@ -9,8 +9,7 @@ import pytest
 # Check that the changes to SkyCoord don't cause unexpected behavior.
 
 
-@pytest.mark.parametrize('a', range(100))
-def test_skycoord_transforms(a):
+def test_skycoord_transforms():
     # An EarthLocation object should still get copied over
     # under transformations.
 
