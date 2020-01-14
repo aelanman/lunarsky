@@ -53,10 +53,14 @@ class SkyCoord(ascoord.SkyCoord):
         # Hacky solution here -- Frames other than LunarTopo cannot accept a MoonLocation object
         # and can get confused by it. Do not pass along `location` unless certain it will work.
         moonloc_incompatible = not isinstance(frame, LunarTopo)
+        graph_attrs = frame_transform_graph.frame_attributes
         if hasattr(self, 'location'):
             loc = getattr(self, 'location')
-            if isinstance(loc, MoonLocation) and moonloc_incompatible:
-                frame_kwargs.pop('location')
+            if isinstance(loc, MoonLocation):
+                if moonloc_incompatible:
+                    frame_kwargs.pop('location')
+            elif 'location' in graph_attrs.keys() and isinstance(graph_attrs['location'], MoonLocationAttribute):
+                frame_transform_graph.frame_attributes['location'] = ascoord.EarthLocationAttribute(default=None)
 
         # Get the composite transform to the new frame
         trans = frame_transform_graph.get_transform(self.frame.__class__, new_frame_cls)
