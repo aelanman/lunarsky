@@ -30,7 +30,7 @@ setup_args = {
     'test_suite': 'pytest',
     'tests_require': ['pytest'],
     'setup_requires': ['pytest-runner'],
-    'install_requires': ['numpy>=1.15', 'astropy>3.0', 'spiceypy'],
+    'install_requires': ['numpy>=1.15', 'astropy>3.0', 'spiceypy', 'jplephem'],
     'classifiers': ['Development Status :: 3 - Alpha',
                     'Intended Audience :: Science/Research',
                     'License :: OSI Approved :: BSD License',
