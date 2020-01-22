@@ -1,5 +1,11 @@
 # lunarsky
 
+
+
+[![Build Status](https://travis-ci.org/aelanman/lunarsky.svg?branch=master)](https://travis-ci.org/aelanman/lunarsky)
+[![codecov](https://codecov.io/gh/aelanman/lunarsky/branch/master/graph/badge.svg)](https://codecov.io/gh/aelanman/lunarsky)
+
+
 An extension to `astropy`, providing selenocentric and topocentric reference frames
 for the Moon and transformations of star positions from the ICRS system to these
 frames. This is to describe the sky as observed from the surface of the Moon.
