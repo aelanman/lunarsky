@@ -4,7 +4,7 @@ import numpy as np
 from astropy import units as u
 from astropy.units.quantity import QuantityInfoBase
 from astropy.coordinates.angles import Longitude, Latitude
-from astropy.coordinates.earth import GeodeticLocation, EarthLocation
+from astropy.coordinates.earth import GeodeticLocation
 from astropy.coordinates.attributes import Attribute
 
 __all__ = ['MoonLocation', 'MoonLocationAttribute']

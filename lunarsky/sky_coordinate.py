@@ -18,10 +18,14 @@ class SkyCoord(ascoord.SkyCoord):
         loc = kwargs.get('location', None)
         if isinstance(loc, MoonLocation):
             frame_transform_graph.frame_attributes['location'] = MoonLocationAttribute(default=None)
+        elif isinstance(loc, ascoord.EarthLocation):
+            frame_transform_graph.frame_attributes['location'] = ascoord.EarthLocationAttribute(default=None)
         super().__init__(*args, **kwargs)
+        # Set the graph to its default
+        frame_transform_graph.frame_attributes['location'] = ascoord.EarthLocationAttribute(default=None)
 
     def transform_to(self, frame, merge_attributes=True):
-        # a modified version of the astropy function.
+        # a modified version of the corresponding astropy function.
         from astropy.coordinates.errors import ConvertError
 
         frame_kwargs = {}
