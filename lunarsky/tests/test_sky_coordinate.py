@@ -38,15 +38,20 @@ def test_skycoord_with_lunar_frames():
     Nsrcs = 10
     alts = np.random.uniform(0,np.pi/2., Nsrcs)
     azs = np.random.uniform(0, 2*np.pi, Nsrcs)
-
+    t0 = Time.now()
     loc = MoonLocation.from_selenodetic(0, 0)
     src = SkyCoord(alt = alts, az = azs, unit='rad', frame='lunartopo',
-                   obstime=Time.now(), location=loc)
+                   obstime=t0, location=loc)
 
     assert src.location == loc
     assert isinstance(src.frame, LunarTopo)
-    x, y, z = src.cartesian.xyz
+    x, y, z = src.transform_to('mcmf').cartesian.xyz
     src2 = SkyCoord(x=x, y=y, z=z, frame='mcmf',
-                   obstime=Time.now(), location=loc)
+                   obstime=t0, location=loc)
 
     assert isinstance(src2.frame, MCMF)
+
+    icrs2 = src2.transform_to('icrs')
+    icrs1 = src.transform_to('icrs')
+    assert np.allclose(icrs2.ra.deg, icrs1.ra.deg, atol=1e-5)
+    assert np.allclose(icrs2.dec.deg, icrs1.dec.deg, atol=1e-5)

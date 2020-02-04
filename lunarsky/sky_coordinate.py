@@ -5,6 +5,7 @@
 import astropy.coordinates as ascoord
 from astropy.coordinates.baseframe import (BaseCoordinateFrame, frame_transform_graph,
                                            GenericFrame)
+from astropy.coordinates.sky_coordinate_parsers import _get_frame_class
 import copy
 
 from .moon import MoonLocation, MoonLocationAttribute
