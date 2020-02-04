@@ -14,6 +14,9 @@ from .topo import LunarTopo
 class SkyCoord(ascoord.SkyCoord):
 
     def __init__(self, *args, **kwargs):
+        loc = kwargs.get('location', None)
+        if isinstance(loc, MoonLocation):
+            frame_transform_graph.frame_attributes['location'] = MoonLocationAttribute(default=None)
         super().__init__(*args, **kwargs)
 
     def transform_to(self, frame, merge_attributes=True):
