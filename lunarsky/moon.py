@@ -232,6 +232,9 @@ class MoonLocation(u.Quantity):
         self._unit = u.meter
         return self.to(height.unit)
 
+    def __str__(self):
+        return self.__repr__()
+
     @property
     def selenodetic(self):
         """Convert to selenodetic coordinates."""
