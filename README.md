@@ -18,7 +18,7 @@ corrections (stellar aberration) will be added.
 * `numpy`
 * `astropy>=3.0`
 * `jplephem`
-* `sciceypy`
+* `spiceypy`
 
 ## Installation
 
