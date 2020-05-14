@@ -2,6 +2,7 @@
 from .moon import *
 from .mcmf import *
 from .topo import *
+from .time import *
 from .sky_coordinate import SkyCoord
 
 from astropy.coordinates.baseframe import frame_transform_graph
