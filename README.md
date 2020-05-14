@@ -42,8 +42,8 @@ with the moon. This is chosen to be the Mean Earth/Polar frame, with a Z axis de
 * `MoonLocation` – Analogous to the `astropy.coordinates.EarthLocation` class, this describes
 positions on the Moon in either selenocentric (x, y, z) or selenodetic (lat, lon, height) coordinates.
 The cartesian axes of the selenocentric system are those of the MCMF frame. In the selenodetic coordinates, "height" is defined relative to a sphere of radius 1737.1 km.
-* `SkyCoord` – A replacement for `astropy.coordinates.SkyCoord`, with modifications that
-ensure compatibility with the `MoonLocation` class.
+* `SkyCoord` – A replacement for `astropy.coordinates.SkyCoord`, with modifications that ensure compatibility with the `MoonLocation` class.
+* `Time` – A replacement for the `astropy.time.Time` class, which can accept a `MoonLocation` instance as its location parameter, allowing for the calculation of local sidereal times on the Moon. The LST of an observer on the Moon is defined as the right ascension of the zenith.
 
 
 ## References

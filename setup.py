@@ -3,14 +3,8 @@
 # Licensed under the 3-clause BSD License
 
 from setuptools import setup
-import glob
-import os
 import io
-import json
 
-#data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
-#with open(os.path.join('pyuvsim', 'GIT_INFO'), 'w') as outfile:
-#    json.dump(data, outfile)
 
 with io.open('README.md', 'r', encoding='utf-8') as readme_file:
     readme = readme_file.read()
@@ -20,7 +14,8 @@ setup_args = {
     'author': 'Adam E. Lanman',
     'url': 'https://github.com/aelanman/lunarsky',
     'license': 'BSD',
-    'description': 'Astropy support for selenocentric (Moon) reference frames and lunar surface observatories.',
+    'description': 'Astropy support for selenocentric (Moon)'
+                   'reference frames and lunar surface observatories.',
     'long_description': readme,
     'long_description_content_type': 'text/markdown',
     'package_dir': {'lunarsky': 'lunarsky'},

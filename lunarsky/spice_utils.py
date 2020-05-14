@@ -32,7 +32,9 @@ def download_kernels(furnish=True):
                     'fk/satellites/moon_assoc_me.tf']
 
     kernel_urls = [_naif_kernel_url + '/' + kn for kn in kernel_names]
-    kernel_paths = download_files_in_parallel(kernel_urls, cache=True, pkgname='lunarsky', show_progress=False)
+    kernel_paths = download_files_in_parallel(
+        kernel_urls, cache=True, pkgname='lunarsky', show_progress=False
+    )
 
     if furnish:
         for kern in kernel_paths:
@@ -62,7 +64,9 @@ def topo_frame_def(latitude, longitude, moon=True):
     idnum += station_num
     fm_center_id = idnum - 1000000
 
-    ecef_to_enu = np.matmul(rotation_matrix(-longitude, 'z', unit='deg'), rotation_matrix(latitude, 'y', unit='deg')).T
+    ecef_to_enu = np.matmul(
+        rotation_matrix(-longitude, 'z', unit='deg'), rotation_matrix(latitude, 'y', unit='deg')
+    ).T
     # Reorder the axes so that X,Y,Z = E,N,U
     ecef_to_enu = ecef_to_enu[[2, 1, 0]]
 

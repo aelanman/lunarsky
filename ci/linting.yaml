@@ -1,0 +1,6 @@
+name: linting
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - pre-commit
