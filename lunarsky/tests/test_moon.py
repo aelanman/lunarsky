@@ -2,19 +2,14 @@
 import pytest
 import numpy as np
 import astropy.units as unit
-from astropy.time import Time
-from astropy.coordinates.baseframe import frame_transform_graph
-from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
-from astropy.coordinates import SkyCoord, AltAz, ICRS, EarthLocation, Angle, Longitude, Latitude
-from astropy.utils.data import download_files_in_parallel
+from astropy.coordinates import Longitude, Latitude
 from lunarsky import MoonLocation, MoonLocationAttribute, MCMF
 import lunarsky.tests as ltests
-import spiceypy as spice
 
 
 class TestsWithObject():
     # The following three functions have been adapted from corresponding
-    ## tests in astropy/coordinates/tests/test_earth.py
+    # tests in astropy/coordinates/tests/test_earth.py
     def setup(self):
         # Check that the setup from different input formats works as expected.
         self.lon = Longitude([0., 45., 90., 135., 180., -180, -90, -45], unit.deg,

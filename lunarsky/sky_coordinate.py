@@ -2,27 +2,30 @@
 
 # Adjust the SkyCoord object to work with either MoonLocation or EarthLocation
 
-import astropy.coordinates as ascoord
+from numpy import sqrt
+from astropy.coordinates import EarthLocationAttribute, EarthLocation, SkyCoord as aSkyCoord
+from astropy.coordinates import UnitSphericalRepresentation
 from astropy.coordinates.baseframe import (BaseCoordinateFrame, frame_transform_graph,
                                            GenericFrame)
 from astropy.coordinates.sky_coordinate_parsers import _get_frame_class
-import copy
+from astropy.constants import c as speed_of_light
 
 from .moon import MoonLocation, MoonLocationAttribute
 from .topo import LunarTopo
 
 
-class SkyCoord(ascoord.SkyCoord):
+class SkyCoord(aSkyCoord):
 
     def __init__(self, *args, **kwargs):
         loc = kwargs.get('location', None)
         if isinstance(loc, MoonLocation):
             frame_transform_graph.frame_attributes['location'] = MoonLocationAttribute(default=None)
-        elif isinstance(loc, ascoord.EarthLocation):
-            frame_transform_graph.frame_attributes['location'] = ascoord.EarthLocationAttribute(default=None)
+        elif isinstance(loc, EarthLocation):
+            frame_transform_graph.frame_attributes['location'] = \
+                EarthLocationAttribute(default=None)
         super().__init__(*args, **kwargs)
         # Set the graph to its default
-        frame_transform_graph.frame_attributes['location'] = ascoord.EarthLocationAttribute(default=None)
+        frame_transform_graph.frame_attributes['location'] = EarthLocationAttribute(default=None)
 
     def transform_to(self, frame, merge_attributes=True):
         # a modified version of the corresponding astropy function.
@@ -67,8 +70,10 @@ class SkyCoord(ascoord.SkyCoord):
             if isinstance(loc, MoonLocation):
                 if moonloc_incompatible:
                     frame_kwargs.pop('location')
-            elif 'location' in graph_attrs.keys() and isinstance(graph_attrs['location'], MoonLocationAttribute):
-                frame_transform_graph.frame_attributes['location'] = ascoord.EarthLocationAttribute(default=None)
+            elif 'location' in graph_attrs.keys() \
+                    and isinstance(graph_attrs['location'], MoonLocationAttribute):
+                frame_transform_graph.frame_attributes['location'] = \
+                    EarthLocationAttribute(default=None)
 
         # Get the composite transform to the new frame
         trans = frame_transform_graph.get_transform(self.frame.__class__, new_frame_cls)
@@ -87,8 +92,8 @@ class SkyCoord(ascoord.SkyCoord):
 
         # Finally make the new SkyCoord object from the `new_coord` and
         # remaining frame_kwargs that are not frame_attributes in `new_coord`.
-        for attr in (set(new_coord.get_frame_attr_names()) &
-                     set(frame_kwargs.keys())):
+        for attr in (set(new_coord.get_frame_attr_names())
+                     & set(frame_kwargs.keys())):
             frame_kwargs.pop(attr)
 
         return self.__class__(new_coord, **frame_kwargs)
@@ -123,7 +128,7 @@ class SkyCoord(ascoord.SkyCoord):
                              'the passed-in `obstime`.')
 
         # Use parent method if given an EarthLocation
-        if isinstance(location, ascoord.EarthLocation):
+        if isinstance(location, EarthLocation):
             return super().radial_velocity_correction(kind=kind, obstime=obstime, location=location)
 
         from astropy.coordinates.solar_system import get_body_barycentric_posvel
@@ -158,7 +163,7 @@ class SkyCoord(ascoord.SkyCoord):
 
         if kind == 'barycentric':
             beta_obs = (v_origin_to_moon + mcmf_v) / speed_of_light
-            gamma_obs = 1 / np.sqrt(1 - beta_obs.norm()**2)
+            gamma_obs = 1 / sqrt(1 - beta_obs.norm()**2)
             gr = location.gravitational_redshift(obstime)
             # barycentric redshift according to eq 28 in Wright & Eastmann (2014),
             # neglecting Shapiro delay and effects of the star's own motion

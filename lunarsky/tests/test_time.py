@@ -23,4 +23,4 @@ def test_sidereal_time_calculation(lat, lon):
     for tt in times:
         src = SkyCoord(alt='90d', az='0d', frame='lunartopo', obstime=tt, location=loc)
         lst = tt.sidereal_time('mean')
-        assert np.isclose(lst, src.transform_to(ICRS()).ra)
+        assert np.isclose(lst.deg, src.transform_to(ICRS()).ra.deg, atol=1e-4)

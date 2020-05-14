@@ -83,12 +83,14 @@ class MoonLocation(u.Quantity):
     This class uses the ME frame.
 
     Positions may be defined in Cartesian (x, y, z) coordinates with respect to the
-    center of mass of the Moon, or in ``selenodetic'' coordinates (longitude, latitude). In selenodetic coordinates,
-    positions are on the surface exactly.
+    center of mass of the Moon, or in ``selenodetic'' coordinates (longitude, latitude).
+    In selenodetic coordinates, positions are on the surface exactly.
 
-    (See "A Standardized Lunar Coordinate System for the Lunar Reconnaissance Orbiter and Lunar Datasets")
-        (TODO -- Add this reference)
-
+    See:
+        "A Standardized Lunar Coordinate System for the Lunar Reconnaissance
+        Orbiter and Lunar Datasets"
+        LRO Project and LGCWG White Paper Version 5, 2008 October 1
+        (https://lunar.gsfc.nasa.gov/library/LunCoordWhitePaper-10-08.pdf)
 
     Notes
     -----
@@ -108,8 +110,7 @@ class MoonLocation(u.Quantity):
 
     def __new__(cls, *args, **kwargs):
         # TODO: needs copy argument and better dealing with inputs.
-        if (len(args) == 1 and len(kwargs) == 0 and
-                isinstance(args[0], MoonLocation)):
+        if (len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], MoonLocation)):
             return args[0].copy()
         try:
             self = cls.from_selenocentric(*args, **kwargs)
@@ -214,7 +215,9 @@ class MoonLocation(u.Quantity):
             height = u.Quantity(height, u.m, copy=False)
 
         if not lon.shape == lat.shape:
-            raise ValueError("Inconsistent quantity shapes: {}, {}".format(str(lon.shape), str(lat.shape)))
+            raise ValueError("Inconsistent quantity shapes: {}, {}".format(
+                str(lon.shape), str(lat.shape))
+            )
         # get selenocentric coordinates. Have to give one-dimensional array.
 
         lunar_radius = u.Quantity(cls._lunar_radius, u.m, copy=False)
