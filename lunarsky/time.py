@@ -2,17 +2,13 @@
 
 import numpy as np
 import astropy
-from astropy import _erfa as erfa
-from astropy.coordinates import EarthLocation, ITRS, Longitude
-import astropy.units as u
-import astropy.time as atime
-import warnings
+from astropy.coordinates import EarthLocation, Longitude
 
 from .moon import MoonLocation
-from .mcmf import MCMF, icrs_to_mcmf_mat
 import spiceypy as spice
 
 __all__ = ['Time']
+
 
 class Time(astropy.time.Time):
     appended_docstr = """
@@ -26,7 +22,7 @@ class Time(astropy.time.Time):
     def __init__(self, val, val2=None, format=None, scale=None,
                  precision=None, in_subfmt=None, out_subfmt=None,
                  location=None, copy=False):
-        
+
         super_loc = None
         if isinstance(location, EarthLocation):
             super_loc = location
@@ -42,25 +38,25 @@ class Time(astropy.time.Time):
         # Currently returns the zenith RA as the LST.
         if self.location is None or self.location is EarthLocation:
             return super().sidereal_time(kind, longitude=longitude, model=model)
-       
+
         if model is not None:
             raise ValueError("The 'model' keyword is not supported"
                              "'for MoonLocation sidereal_times.")
 
         # From here on, proceed assuming longitude or location refer
-        # to the selenodetic coordinate system. "self.location" must be defined in order to get here.
+        # to the selenodetic coordinate system. "self.location" must
+        # be defined in order to get here.
 
         et = (self - Time('J2000')).sec
         mat = spice.pxform('MOON_ME', 'J2000', et)
-        
+
         # Zenith vector
         zvec = self.location.mcmf.cartesian.xyz
         uzvec = zvec / np.linalg.norm(zvec)
-        
+
         newvec = np.dot(mat, uzvec)
 
-        return Longitude(np.arctan2(newvec[1], newvec[0]), 'rad')
-
+        return Longitude(np.arctan2(newvec[1], newvec[0]).squeeze(), 'rad')
 
     sidereal_time.__doc__ = astropy.time.Time.sidereal_time.__doc__ + """
         Notes
@@ -70,8 +66,9 @@ class Time(astropy.time.Time):
         of zenith over the MoonLocation.
         """
 
-    def light_travel_time(*args, **kwargs):
+    def light_travel_time(self, *args, **kwargs):
         if isinstance(self.location, MoonLocation):
-            raise ValueError("Light travel time calculations are not yet supported for MoonLocation")
+            raise ValueError("Light travel time calculations are not"
+                             "yet supported for MoonLocation")
 
         return super().light_travel_time(*args, **kwargs)

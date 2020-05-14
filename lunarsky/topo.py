@@ -38,10 +38,8 @@ doc_footer = """
     obstime : `~astropy.time.Time`
         The time at which the observation is taken.  Used for determining the
         position and orientation of the Earth.
-    location : `~astropy.coordinates.EarthLocation`
-        The location on the Earth.  This can be specified either as an
-        `~astropy.coordinates.EarthLocation` object or as anything that can be
-        transformed to an `~astropy.coordinates.ITRS` frame.
+    location : `~lunarsky.MoonLocation`
+        The location on the Moon.
     """
 
 
@@ -92,7 +90,7 @@ def _spice_setup(latitude, longitude):
     if loadnew:
         station_name, idnum, frame_specs, latlon = topo_frame_def(latitude, longitude, moon=True)
         spice.pcpool('TOPO_LAT_LON', latlon)
-        frame_strs = ["{}={}".format(k,v) for (k,v) in frame_specs.items()]
+        frame_strs = ["{}={}".format(k, v) for (k, v) in frame_specs.items()]
         spice.lmpool(frame_strs)
 
 
