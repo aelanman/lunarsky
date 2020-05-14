@@ -1,0 +1,13 @@
+name: tests
+channels:
+  - defaults
+dependencies:
+  - astropy>=4.0
+  - spiceypy
+  - jplephem
+  - coverage
+  - numpy>=1.15
+  - pip
+  - psutil
+  - pytest
+  - pytest-cov

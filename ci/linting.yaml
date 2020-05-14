@@ -1,0 +1,5 @@
+name: linting
+channels:
+  - defaults
+dependencies:
+  - pre-commit
