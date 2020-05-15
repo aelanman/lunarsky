@@ -48,15 +48,15 @@ class Time(astropy.time.Time):
         # be defined in order to get here.
 
         et = (self - Time('J2000')).sec
-        mat = spice.pxform('MOON_ME', 'J2000', et)
+        et = np.atleast_1d(et)
+        mats = np.array([spice.pxform('MOON_ME', 'J2000', t) for t in et])
 
         # Zenith vector
         zvec = self.location.mcmf.cartesian.xyz
         uzvec = zvec / np.linalg.norm(zvec)
 
-        newvec = np.dot(mat, uzvec)
-
-        return Longitude(np.arctan2(newvec[1], newvec[0]).squeeze(), 'rad')
+        newvec = np.dot(mats, uzvec)
+        return Longitude(np.arctan2(newvec[..., 1], newvec[..., 0]).squeeze(), 'rad')
 
     sidereal_time.__doc__ = astropy.time.Time.sidereal_time.__doc__ + """
         Notes
