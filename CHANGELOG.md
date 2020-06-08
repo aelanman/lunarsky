@@ -1,6 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.0.2]
+
+## Added
+- More references to README
 
 ## Changed
 - Keep pck and fk kernels in the repository, instead of caching.

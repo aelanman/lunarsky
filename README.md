@@ -25,7 +25,13 @@ corrections (stellar aberration) will be added.
 `lunarsky` may be installed with pip:
 
 ```
-pip install git+https://github.com/aelanman/lunarsky
+pip install lunarsky
+```
+
+or from the repository:
+```
+git clone https://github.com/aelanman/lunarsky
+python setup.py install
 ```
 
 ## Usage
@@ -46,5 +52,15 @@ The cartesian axes of the selenocentric system are those of the MCMF frame. In t
 * `Time` – A replacement for the `astropy.time.Time` class, which can accept a `MoonLocation` instance as its location parameter, allowing for the calculation of local sidereal times on the Moon. The LST of an observer on the Moon is defined as the right ascension of the zenith.
 
 
+## Credit
+
+This package makes use fo the ``spiceypy`` wrapper [2] for the JPl SPICE Toolkit, produced by the NASA Navigation and Ancillary Information Facility (NAIF) [3] [4]. The transformations are defined using data in kernel files ``pck/moon_pa_de421_1900-2050.bpc``, ``moon_080317.tf``, and ``moon_assoc_me.tf``. These may be found at [the NAIF website](https://naif.jpl.nasa.gov/pub/naif/generic_kernels), and were produced by Nat Bachman (NAIF/JPL) in March 2008. Further information may be found in the comments in these files in the `data` directory.
+
 ## References
 [1]: Ye, Hanlin, et al. "Looking Vector Direction Analysis for the Moon-Based Earth Observation Optical Sensor." IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing, vol. 11, no. 11, Nov. 2018, pp. 4488–99. IEEE Xplore, doi:10.1109/JSTARS.2018.2870247.
+
+[2]: Annex et al., (2020). SpiceyPy: a Pythonic Wrapper for the SPICE Toolkit. Journal of Open Source Software, 5(46), 2050, https://doi.org/10.21105/joss.02050
+
+[3]: Acton, C.H.; "Ancillary Data Services of NASA's Navigation and Ancillary Information Facility;" Planetary and Space Science, Vol. 44, No. 1, pp. 65-70, 1996.
+
+[4]: Charles Acton, Nathaniel Bachman, Boris Semenov, Edward Wright; A look toward the future in the handling of space science mission geometry; Planetary and Space Science (2017); DOI 10.1016/j.pss.2017.02.013; https://doi.org/10.1016/j.pss.2017.02.013
