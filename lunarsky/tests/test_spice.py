@@ -67,7 +67,8 @@ def test_spice_earth():
 
     # One more kernel is needed for the ITRF93 frame.
     kname = 'pck/earth_latest_high_prec.bpc'
-    kurl = [lunarsky.spice_utils._naif_kernel_url + '/' + kname]
+    _naif_kernel_url = 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels'
+    kurl = [_naif_kernel_url + '/' + kname]
     kernpath = download_files_in_parallel(kurl, cache=True, show_progress=False, pkgname='lunarsky')
     spice.furnsh(kernpath)
 

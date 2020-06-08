@@ -1,6 +1,7 @@
 
 import numpy as np
-from astropy.utils.data import download_files_in_parallel, get_cached_urls, download_file
+import os
+from astropy.utils.data import get_cached_urls, download_file
 from astropy.coordinates.solar_system import solar_system_ephemeris
 from astropy.coordinates.matrix_utilities import rotation_matrix
 from astropy.time import Time
@@ -9,8 +10,7 @@ import astropy.units as unit
 import spiceypy as spice
 
 from .mcmf import MCMF
-
-_naif_kernel_url = 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels'
+from .data import DATA_PATH
 
 
 def check_is_loaded(search):
@@ -26,19 +26,14 @@ def check_is_loaded(search):
     return True
 
 
-def download_kernels(furnish=True):
+def furnish_kernels():
     kernel_names = ['pck/moon_pa_de421_1900-2050.bpc',
                     'fk/satellites/moon_080317.tf',
                     'fk/satellites/moon_assoc_me.tf']
 
-    kernel_urls = [_naif_kernel_url + '/' + kn for kn in kernel_names]
-    kernel_paths = download_files_in_parallel(
-        kernel_urls, cache=True, pkgname='lunarsky', show_progress=False
-    )
-
-    if furnish:
-        for kern in kernel_paths:
-            spice.furnsh(kern)
+    kernel_paths = [os.path.join(DATA_PATH, kn) for kn in kernel_names]
+    for kp in kernel_paths:
+        spice.furnsh(kp)
 
     return kernel_paths
 
@@ -104,12 +99,13 @@ def earth_pos_mcmf(obstime):
     Used for tests.
     """
     solar_system_ephemeris.set('jpl')
+
     spkurls = [url for url in get_cached_urls() if 'spk' in url]
     for url in spkurls:
         # Roundabout way to get the path of the cached spk file.
         fpath = download_file(url, cache=True, show_progress=False)
         spice.furnsh(fpath)
-        print(url, fpath)
+
     et = (obstime - Time("J2000")).sec
     earthpos, ltt = spice.spkpos('earth', et, 'MOON_ME', 'None', 'moon')
     earthpos = unit.Quantity(earthpos, 'km')
@@ -121,4 +117,4 @@ def cleanup():
     return 0
 
 
-KERNEL_PATHS = download_kernels()
+KERNEL_PATHS = furnish_kernels()
