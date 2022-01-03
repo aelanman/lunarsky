@@ -7,6 +7,7 @@ from astropy.utils.data import download_files_in_parallel
 import lunarsky
 import lunarsky.tests as ltests
 import lunarsky.spice_utils as spice_utils
+from lunarsky.time import Time
 
 
 import spiceypy as spice
@@ -57,10 +58,12 @@ def test_spice_earth():
 
     loc = EarthLocation.from_geodetic(lon, lat)
 
-    altaz = stars.transform_to(AltAz(location=loc))
+    altaz = stars.transform_to(AltAz(location=loc, obstime=Time("J2000")))
 
     trans_path, steps = frame_transform_graph.find_shortest_path(ICRS, AltAz)
-    assert steps == 2
+
+    # Was 2. As of May 2021, AltAz<->ICRs no longer has to go through CIRS.
+    assert steps == 1
 
     # Make the Earth topo frame in spice.
     framename, idnum, frame_dict, latlon = lunarsky.spice_utils.topo_frame_def(lat, lon, moon=False)
@@ -86,12 +89,12 @@ def test_spice_earth():
     trans_path2, steps2 = frame_transform_graph.find_shortest_path(ICRS, AltAz)
     assert steps2 == 1
 
-    altaz2 = stars.transform_to(AltAz(location=loc))
+    altaz2 = stars.transform_to(AltAz(location=loc, obstime=Time("J2000")))
 
     # Having done the transform, remove the spice transform from the graph
     frame_transform_graph.remove_transform(ICRS, AltAz, None)
     trans_path2, steps2 = frame_transform_graph.find_shortest_path(ICRS, AltAz)
-    assert steps2 == 2
+    assert steps2 == 2      # It's two now because we have to go through CIRS again.
 
     assert ltests.positions_close(altaz, altaz2, Angle(25, 'arcsec'))
 

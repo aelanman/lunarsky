@@ -434,5 +434,5 @@ class MoonLocationAttribute(Attribute):
                 raise ValueError('"{}" was passed into a '
                                  'MoonLocationAttribute, but it does not have '
                                  '"transform_to" method'.format(value))
-            mcmfobj = value.transform_to(MCMF)
+            mcmfobj = value.transform_to(MCMF())
             return mcmfobj.moon_location, True
