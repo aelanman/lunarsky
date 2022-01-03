@@ -1,5 +1,4 @@
 
-
 from astropy.coordinates.baseframe import frame_transform_graph
 from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
 from astropy.coordinates import AltAz, ICRS, EarthLocation, Angle
@@ -60,11 +59,6 @@ def test_spice_earth():
 
     altaz = stars.transform_to(AltAz(location=loc, obstime=Time("J2000")))
 
-    trans_path, steps = frame_transform_graph.find_shortest_path(ICRS, AltAz)
-
-    # Was 2. As of May 2021, AltAz<->ICRs no longer has to go through CIRS.
-    assert steps == 1
-
     # Make the Earth topo frame in spice.
     framename, idnum, frame_dict, latlon = lunarsky.spice_utils.topo_frame_def(lat, lon, moon=False)
 
@@ -79,22 +73,19 @@ def test_spice_earth():
     spice.lmpool(frame_strs)
 
     @frame_transform_graph.transform(FunctionTransformWithFiniteDifference, ICRS, AltAz)
-    def icrs_to_mcmf(icrs_coo, mcmf_frame):
-
+    def icrs_to_ecef(icrs_coo, ecef_frame):
         mat = spice.pxform('J2000', framename, 0)
         newrepr = icrs_coo.cartesian.transform(mat)
 
-        return mcmf_frame.realize_frame(newrepr)
+        return ecef_frame.realize_frame(newrepr)
 
-    trans_path2, steps2 = frame_transform_graph.find_shortest_path(ICRS, AltAz)
-    assert steps2 == 1
+    tr = frame_transform_graph.get_transform(ICRS, AltAz).transforms
+    assert tr[0].func.__name__ == "icrs_to_ecef"    # Confirm new transform added correctly
 
     altaz2 = stars.transform_to(AltAz(location=loc, obstime=Time("J2000")))
 
     # Having done the transform, remove the spice transform from the graph
     frame_transform_graph.remove_transform(ICRS, AltAz, None)
-    trans_path2, steps2 = frame_transform_graph.find_shortest_path(ICRS, AltAz)
-    assert steps2 == 2      # It's two now because we have to go through CIRS again.
 
     assert ltests.positions_close(altaz, altaz2, Angle(25, 'arcsec'))
 
