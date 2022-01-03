@@ -71,7 +71,8 @@ def test_earth_from_moon():
         dist = np.linalg.norm(mcmf.cartesian.xyz.to('km').value)
         assert lunar_perigee < dist < lunar_apogee
         top = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=tim))
-        zaaz_deg[ti, :] = [top.zen.deg, top.az.deg]
+        zaaz_deg[ti, 0] = top.zen.deg
+        zaaz_deg[ti, 1] = top.az.deg
 
     assert np.all(zaaz_deg[:, 0] < 10)  # All zenith angles should be less than 10 degrees
 
@@ -85,3 +86,21 @@ def test_earth_from_moon():
     closest = np.argmin(np.abs(moonfreq - ks[sel]))
     peakloc = np.argmax(np.abs(_az[sel]))
     assert peakloc == closest
+
+
+def test_multi_times():
+    # Check vectorization over time axis for LunarTopo transformations
+    Ntimes = 200
+    times = Time(lunarsky.topo._J2000.jd
+                 + np.linspace(0, 10 / (24 * 60), Ntimes), format='jd')
+    height = 10.0     # m
+    lon, lat = 45, 55
+    star = lunarsky.SkyCoord(ra=[35], dec=[17], unit='deg', frame='icrs')
+    loc = lunarsky.MoonLocation.from_selenodetic(lon, lat, height)
+    topo0 = star.transform_to(lunarsky.LunarTopo(location=loc, obstime=times))
+    icrs0 = topo0.transform_to(ascoord.ICRS())
+    assert ltests.positions_close(star, icrs0, ascoord.Angle(5.0, 'arcsec'))
+
+    mcmf0 = topo0.transform_to(lunarsky.MCMF(obstime=times))
+    mcmf1 = star.transform_to(lunarsky.MCMF(obstime=times))
+    assert ltests.positions_close(mcmf0, mcmf1, ascoord.Angle(5.0, 'arcsec'))

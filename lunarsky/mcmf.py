@@ -1,4 +1,5 @@
 
+import numpy as np
 from astropy.utils.decorators import format_doc
 from astropy.coordinates.representation import CartesianRepresentation, CartesianDifferential
 from astropy.coordinates.baseframe import BaseCoordinateFrame, base_doc, frame_transform_graph
@@ -49,8 +50,8 @@ def icrs_to_mcmf_mat(time):
     # time = single astropy Time object.
 
     # Ephemeris time = seconds since J2000
-    et = (time - Time('J2000')).sec
-    mat = spice.pxform('J2000', 'MOON_ME', et)
+    ets = np.atleast_1d((time - Time('J2000')).sec)
+    mat = np.stack([spice.pxform('J2000', 'MOON_ME', et) for et in ets], axis=0)
 
     return mat
 

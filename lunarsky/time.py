@@ -11,13 +11,13 @@ __all__ = ['Time']
 
 
 class Time(astropy.time.Time):
-    appended_docstr = """
+    _appended_docstr = """
     Notes
     -----
     location can also be given as a `lunarsky.MoonLocation` object.
     """
 
-    __doc__ = astropy.time.Time.__doc__ + appended_docstr
+    __doc__ = astropy.time.Time.__doc__ + _appended_docstr
 
     def __init__(self, val, val2=None, format=None, scale=None,
                  precision=None, in_subfmt=None, out_subfmt=None,
@@ -47,8 +47,7 @@ class Time(astropy.time.Time):
         # to the selenodetic coordinate system. "self.location" must
         # be defined in order to get here.
 
-        et = (self - Time('J2000')).sec
-        et = np.atleast_1d(et)
+        et = np.atleast_1d((self - Time('J2000')).sec)
         mats = np.array([spice.pxform('MOON_ME', 'J2000', t) for t in et])
 
         # Zenith vector
