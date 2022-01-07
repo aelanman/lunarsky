@@ -1,4 +1,3 @@
-
 import pytest
 import numpy as np
 import astropy.units as unit
@@ -7,15 +6,18 @@ from lunarsky import MoonLocation, MoonLocationAttribute, MCMF
 import lunarsky.tests as ltests
 
 
-class TestsWithObject():
+class TestsWithObject:
     # The following three functions have been adapted from corresponding
     # tests in astropy/coordinates/tests/test_earth.py
     def setup(self):
         # Check that the setup from different input formats works as expected.
-        self.lon = Longitude([0., 45., 90., 135., 180., -180, -90, -45], unit.deg,
-                             wrap_angle=180 * unit.deg)
-        self.lat = Latitude([+0., 30., 60., +90., -90., -60., -30., 0.], unit.deg)
-        self.h = unit.Quantity([0.1, 0.5, 1.0, -0.5, -1.0, +4.2, -11., -.1], unit.m)
+        self.lon = Longitude(
+            [0.0, 45.0, 90.0, 135.0, 180.0, -180, -90, -45],
+            unit.deg,
+            wrap_angle=180 * unit.deg,
+        )
+        self.lat = Latitude([+0.0, 30.0, 60.0, +90.0, -90.0, -60.0, -30.0, 0.0], unit.deg)
+        self.h = unit.Quantity([0.1, 0.5, 1.0, -0.5, -1.0, +4.2, -11.0, -0.1], unit.m)
         self.location = MoonLocation.from_selenodetic(self.lon, self.lat, self.h)
         self.x, self.y, self.z = self.location.to_selenocentric()
 
@@ -43,8 +45,7 @@ class TestsWithObject():
             MoonLocation.from_selenocentric(self.h, self.lon, self.lat)
         # floats without a unit
         with pytest.raises(TypeError):
-            MoonLocation.from_selenocentric(self.x.value, self.y.value,
-                                            self.z.value)
+            MoonLocation.from_selenocentric(self.x.value, self.y.value, self.z.value)
         # inconsistent shape
         with pytest.raises(ValueError):
             MoonLocation.from_selenocentric(self.x, self.y, self.z[:5])
@@ -87,8 +88,12 @@ def test_moonlocation_attribute():
 
     # If not None, this will look for a "transform_to"
     # method, which of course a string doesn't have.
-    ltests.assert_raises_message(ValueError, 'was passed into a MoonLocationAttribute',
-                                 mlattr.convert_input, 'string')
+    ltests.assert_raises_message(
+        ValueError,
+        "was passed into a MoonLocationAttribute",
+        mlattr.convert_input,
+        "string",
+    )
 
     attr2, boo = mlattr.convert_input(moonloc.mcmf)
     assert np.all(attr2 == moonloc)
