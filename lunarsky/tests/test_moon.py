@@ -3,7 +3,6 @@ import numpy as np
 import astropy.units as unit
 from astropy.coordinates import Longitude, Latitude
 from lunarsky import MoonLocation, MoonLocationAttribute, MCMF
-import lunarsky.tests as ltests
 
 
 class TestsWithObject:
@@ -88,12 +87,8 @@ def test_moonlocation_attribute():
 
     # If not None, this will look for a "transform_to"
     # method, which of course a string doesn't have.
-    ltests.assert_raises_message(
-        ValueError,
-        "was passed into a MoonLocationAttribute",
-        mlattr.convert_input,
-        "string",
-    )
+    with pytest.raises(ValueError, match="was passed into a MoonLocationAttribute"):
+        mlattr.convert_input("string")
 
     attr2, boo = mlattr.convert_input(moonloc.mcmf)
     assert np.all(attr2 == moonloc)

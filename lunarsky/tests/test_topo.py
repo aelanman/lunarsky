@@ -3,43 +3,45 @@ import astropy.coordinates as ac
 from astropy import units as un
 from astropy.tests.helper import assert_quantity_allclose
 import lunarsky
-import lunarsky.tests as ltests
 import numpy as np
 import pytest
 
 
-Ntimes = 5
+# Lunar station positions
 Nangs = 3
 latitudes = np.linspace(0, 90, Nangs)
 longitudes = np.linspace(0, 360, Nangs)
 latlons = [(lat, lon) for lon in longitudes for lat in latitudes]
 
-# Ten years of time.
-times = Time(lunarsky.topo._J2000.jd + np.linspace(0, 10 * 365.25, Ntimes), format="jd")
+# Times
+t0 = Time("2010-10-28T15:30:00")
+_J2000 = Time("J2000")
+
+jd_10yr = Time(t0.jd + np.linspace(0, 10 * 365.25, 5), format="jd")
+et_10yr = (jd_10yr - _J2000).sec
+
+jd_4mo = t0 + TimeDelta(np.linspace(0, 4 * 28 * 24 * 3600.0, 100), format="sec")
+et_4mo = (jd_4mo - _J2000).sec
 
 
-@pytest.mark.parametrize("time", times)
+@pytest.mark.parametrize("time", jd_10yr)
 @pytest.mark.parametrize("lat,lon", latlons)
-def test_icrs_to_mcmf(time, lat, lon):
+def test_icrs_to_mcmf(time, lat, lon, grcat):
     # Check that the following transformation paths are equivalent:
     #   ICRS -> MCMF -> TOPO
     #   ICRS -> TOPO
-
-    stars = ltests.get_catalog()
-
     loc = lunarsky.MoonLocation.from_selenodetic(lon, lat)
-
-    topo0 = stars.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
-    mcmf = stars.transform_to(lunarsky.MCMF(obstime=time))
+    topo0 = grcat.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
+    mcmf = grcat.transform_to(lunarsky.MCMF(obstime=time))
     topo1 = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
-    assert ltests.positions_close(topo0, topo1, ac.Angle(10.0, "arcsec"))
+    assert np.all(topo0.separation(topo1) < ac.Angle("10arcsec"))
 
 
 @pytest.mark.parametrize(
     "obj",
     [
         ac.get_sun(Time("2025-05-30T03:30:19.00")).transform_to(ac.ICRS),
-        ltests.get_catalog()[150],
+        ac.SkyCoord(ra="30d", dec="-70d", frame="icrs"),
     ],
 )
 @pytest.mark.parametrize("path", [["lunartopo"], ["mcmf"], ["lunartopo", "mcmf"]])
@@ -61,49 +63,44 @@ def test_transform_loops(obj, path):
     assert_quantity_allclose(obj.cartesian.xyz, orig_pos, atol=tol)
 
 
-@pytest.mark.parametrize("time", times)
+@pytest.mark.parametrize("time", jd_10yr)
 @pytest.mark.parametrize("lat,lon", latlons)
-def test_topo_transform_loop(time, lat, lon):
+def test_topo_transform_loop(time, lat, lon, grcat):
     # Testing remaining transformations
     height = 10.0  # m
-    stars = ltests.get_catalog()
     loc = lunarsky.MoonLocation.from_selenodetic(lon, lat, height)
-    topo0 = stars.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
+    topo0 = grcat.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
     icrs0 = topo0.transform_to(ac.ICRS())
-    assert ltests.positions_close(stars, icrs0, ac.Angle(5.0, "arcsec"))
+    assert np.all(grcat.separation(icrs0) < ac.Angle("5arcsec"))
 
     mcmf0 = topo0.transform_to(lunarsky.MCMF(obstime=time))
-    mcmf1 = stars.transform_to(lunarsky.MCMF(obstime=time))
-    assert ltests.positions_close(mcmf0, mcmf1, ac.Angle(5.0, "arcsec"))
+    mcmf1 = grcat.transform_to(lunarsky.MCMF(obstime=time))
+    assert np.all(mcmf0.separation(mcmf1) < ac.Angle("5arcsec"))
 
 
 def test_earth_from_moon():
     # Look at the position of the Earth in lunar reference frames.
-    Ntimes = 100
-    ets = np.linspace(0, 4 * 28 * 24 * 3600.0, Ntimes)  # Four months
-    times_jd = Time.now() + TimeDelta(ets, format="sec")
 
-    # Minimum and maximum, respectively, over the year.
-    # The lunar apogee nad perigee vary over time. These are
+    # The lunar apo/perigee vary over time. These are
     # chosen from a table of minimum/maxmium perigees over a century.
     # http://astropixels.com/ephemeris/moon/moonperap2001.html
     lunar_perigee = 356425.0  # km, Dec 6 2052
     lunar_apogee = 406709.0  # km, Dec 12 2061
 
-    mcmf = lunarsky.spice_utils.earth_pos_mcmf(times_jd)
+    mcmf = lunarsky.spice_utils.earth_pos_mcmf(jd_4mo)
     dists = mcmf.spherical.distance.to_value("km")
     assert all((lunar_perigee < dists) & (dists < lunar_apogee))
 
-    # Compare position of Earth in MCMF frame from astropy and from spice
-    #   TODO Lower this tolerance
-    epos_icrs = ac.SkyCoord(ac.get_body_barycentric("earth", times_jd), frame="icrs")
-    mcmf_ap = epos_icrs.transform_to(lunarsky.MCMF(obstime=times_jd)).frame
-    assert_quantity_allclose(mcmf_ap.cartesian.xyz, mcmf.cartesian.xyz, atol="100m")
+    # # Compare position of Earth in MCMF frame from astropy and from spice
+    epos_icrs = ac.SkyCoord(ac.get_body_barycentric("earth", jd_4mo), frame="icrs")
+    mcmf_ap = epos_icrs.transform_to(lunarsky.MCMF(obstime=jd_4mo)).frame
+    assert_quantity_allclose(mcmf_ap.cartesian.xyz, mcmf.cartesian.xyz, atol="5km")
+    #   TODO Lower this tolerance ^
 
     # Now test LunarTopo frame positions
     lat, lon = 0, 0  # deg
     loc = lunarsky.MoonLocation.from_selenodetic(lat, lon)
-    topo = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=times_jd))
+    topo = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=jd_4mo))
 
     # The Earth should stay within 10 deg of zenith of lat=lon=0 position
     assert np.all(topo.zen.deg < 10)
@@ -112,7 +109,7 @@ def test_earth_from_moon():
     # is consistent with the Moon's orbit.
     moonfreq = 1 / (28.0 * 24.0 * 3600.0)  # Hz, frequency of the moon's orbit
     _az = np.fft.fft(topo.az.deg)
-    ks = np.fft.fftfreq(Ntimes, d=np.diff(ets)[0])
+    ks = np.fft.fftfreq(jd_4mo.size, d=np.diff(et_4mo)[0])
     sel = ks > 0
 
     closest = np.argmin(np.abs(moonfreq - ks[sel]))
@@ -122,21 +119,17 @@ def test_earth_from_moon():
 
 def test_multi_times():
     # Check vectorization over time axis for LunarTopo transformations
-    Ntimes = 200
-    times = Time(
-        lunarsky.topo._J2000.jd + np.linspace(0, 10 / (24 * 60), Ntimes), format="jd"
-    )
-    height = 10.0  # m
-    lon, lat = 45, 55
-    loc = lunarsky.MoonLocation.from_selenodetic(lon, lat, height)
+    lat, lon = latlons[6]
+    loc = lunarsky.MoonLocation.from_selenodetic(lon, lat, height=10)
     star = lunarsky.SkyCoord(ra=[35], dec=[17], unit="deg", frame="icrs")
-    topo0 = star.transform_to(lunarsky.LunarTopo(location=loc, obstime=times))
+    topo0 = star.transform_to(lunarsky.LunarTopo(location=loc, obstime=jd_4mo))
     icrs0 = topo0.transform_to(ac.ICRS())
-    assert ltests.positions_close(star, icrs0, ac.Angle(5.0, "arcsec"))
 
-    mcmf0 = topo0.transform_to(lunarsky.MCMF(obstime=times))
-    mcmf1 = star.transform_to(lunarsky.MCMF(obstime=times))
-    assert ltests.positions_close(mcmf0, mcmf1, ac.Angle(5.0, "arcsec"))
+    assert np.all(star.separation(icrs0) < ac.Angle("5arcsec"))
+
+    mcmf0 = topo0.transform_to(lunarsky.MCMF(obstime=jd_4mo))
+    mcmf1 = star.transform_to(lunarsky.MCMF(obstime=jd_4mo))
+    assert np.all(mcmf0.separation(mcmf1) < ac.Angle("5arcsec"))
 
 
 def test_sidereal_vs_solar_day():
@@ -168,22 +161,21 @@ def test_sidereal_vs_solar_day():
     assert np.isclose(obj_per.jd, 27.13, atol=0.1)
 
 
+@pytest.mark.parametrize(
+    "loc",
+    [
+        lunarsky.MoonLocation.from_selenodetic(lat, lon, 10.0)
+        for lat, lon in [(27, 53), (10, 8)]
+    ],
+)
 @pytest.mark.parametrize("toframe", ["lunartopo", "mcmf"])
-def test_nearby_obj_transforms(toframe):
-    ntimes = 4
-    ts = Time("2025-01-01T00:00:00") + TimeDelta(
-        np.linspace(0, 4 * 3600, ntimes), format="sec"
-    )
-
-    sun_gcrs = ac.get_sun(ts)
-
-    loc = lunarsky.MoonLocation.from_selenodetic(45, 56, 10.0)
+def test_nearby_obj_transforms(toframe, loc):
+    sun_gcrs = ac.get_sun(jd_4mo)
 
     if toframe == "lunartopo":
-        frame = lunarsky.LunarTopo(location=loc, obstime=ts)
+        frame = lunarsky.LunarTopo(location=loc, obstime=jd_4mo)
     elif toframe == "mcmf":
-        frame = lunarsky.MCMF(obstime=ts)
+        frame = lunarsky.MCMF(obstime=jd_4mo)
 
-    res = sun_gcrs.transform_to(frame).transform_to(ac.GCRS(obstime=ts))
-
+    res = sun_gcrs.transform_to(frame).transform_to(ac.GCRS(obstime=jd_4mo))
     assert_quantity_allclose(sun_gcrs.cartesian.xyz, res.cartesian.xyz)

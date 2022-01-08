@@ -1,7 +1,6 @@
 import numpy as np
 import os
 from astropy.utils.data import download_files_in_parallel
-from astropy.coordinates.solar_system import solar_system_ephemeris
 from astropy.coordinates.matrix_utilities import rotation_matrix
 from astropy.time import Time
 import astropy.units as unit
@@ -19,13 +18,31 @@ def check_is_loaded(search):
     """
     Search the kernel pool variable names for a given string.
     """
-
     try:
         spice.gnpool(search, 0, 100)
     except (spice.support_types.SpiceyError):
         return False
-
     return True
+
+
+def list_kernels():
+    """
+    List loaded kernels.
+
+    Returns
+    -------
+    list of str
+        Kernel names (file paths)
+    list of str
+        Corresponding kernel types
+    """
+    knames, ktypes = [], []
+    for typ in ["spk", "fk", "tk", "pck", "lsk"]:
+        for ii in range(spice.ktotal(typ)):
+            dat = spice.kdata(ii, typ)
+            knames.append(dat[0])
+            ktypes.append(dat[1])
+    return knames, ktypes
 
 
 def furnish_kernels():
@@ -178,14 +195,6 @@ def earth_pos_mcmf(obstimes):
 
     Used for tests.
     """
-    solar_system_ephemeris.set("jpl")
-
-    #    spkurls = [url for url in get_cached_urls() if 'spk' in url]
-    #    for url in spkurls:
-    #        # Roundabout way to get the path of the cached spk file.
-    #        fpath = download_file(url, cache=True, show_progress=False)
-    #        spice.furnsh(fpath)
-
     ets = (obstimes - Time("J2000")).sec
     earthpos = np.stack(
         [spice.spkpos("399", et, "MOON_ME", "None", "301")[0] for et in ets]

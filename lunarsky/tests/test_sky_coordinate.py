@@ -1,5 +1,4 @@
 import numpy as np
-import lunarsky.tests as ltest
 
 from astropy.coordinates import ICRS, GCRS, EarthLocation, AltAz
 from astropy.time import Time
@@ -9,14 +8,13 @@ from lunarsky import MoonLocation, SkyCoord, LunarTopo, MCMF
 # Check that the changes to SkyCoord don't cause unexpected behavior.
 
 
-def test_skycoord_transforms():
+def test_skycoord_transforms(grcat):
     # An EarthLocation object should still get copied over
     # under transformations.
 
     eloc = EarthLocation.from_geodetic(0.0, 10.0)
-    coords = ltest.get_catalog()
 
-    altaz = coords.transform_to(AltAz(location=eloc, obstime=Time.now()))
+    altaz = grcat.transform_to(AltAz(location=eloc, obstime=Time.now()))
 
     assert altaz.location == eloc
 
