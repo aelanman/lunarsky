@@ -21,11 +21,16 @@ setup_args = {
     "long_description_content_type": "text/markdown",
     "package_dir": {"lunarsky": "lunarsky"},
     "packages": ["lunarsky", "lunarsky.tests"],
-    "version": "0.0.2",
+    "use_scm_version": {
+        "root": ".",
+        "relative_to": __file__,
+        "local_scheme": "guess-next-dev",
+        "write_to": "lunarsky/version.py",
+    },
     "include_package_data": True,
     "test_suite": "pytest",
     "tests_require": ["pytest"],
-    "setup_requires": ["pytest-runner"],
+    "setup_requires": ["pytest-runner", "setuptools_scm"],
     "install_requires": ["numpy>=1.15", "astropy>3.0", "spiceypy", "jplephem"],
     "classifiers": [
         "Development Status :: 3 - Alpha",
