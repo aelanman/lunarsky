@@ -1,5 +1,3 @@
-
-
 import numpy as np
 from astropy import units as u
 from astropy.units.quantity import QuantityInfoBase
@@ -7,7 +5,7 @@ from astropy.coordinates.angles import Longitude, Latitude
 from astropy.coordinates.earth import GeodeticLocation
 from astropy.coordinates.attributes import Attribute
 
-__all__ = ['MoonLocation', 'MoonLocationAttribute']
+__all__ = ["MoonLocation", "MoonLocationAttribute"]
 
 
 class MoonLocationInfo(QuantityInfoBase):
@@ -16,13 +14,14 @@ class MoonLocationInfo(QuantityInfoBase):
     required when the object is used as a mixin column within a table, but can
     be used as a general way to store meta information.
     """
-    _represent_as_dict_attrs = ('x', 'y', 'z')
+
+    _represent_as_dict_attrs = ("x", "y", "z")
 
     def _construct_from_dict(self, map):
         out = self._parent_cls(**map)
         return out
 
-    def new_like(self, cols, length, metadata_conflicts='warn', name=None):
+    def new_like(self, cols, length, metadata_conflicts="warn", name=None):
         """
         Return a new MoonLocation instance which is consistent with the
         input ``cols`` and has ``length`` rows.
@@ -49,20 +48,24 @@ class MoonLocationInfo(QuantityInfoBase):
         # Very similar to QuantityInfo.new_like, but the creation of the
         # map is different enough that this needs its own rouinte.
         # Get merged info attributes shape, dtype, format, description.
-        attrs = self.merge_cols_attributes(cols, metadata_conflicts, name,
-                                           ('meta', 'format', 'description'))
+        attrs = self.merge_cols_attributes(
+            cols, metadata_conflicts, name, ("meta", "format", "description")
+        )
         # The above raises an error if the dtypes do not match, but returns
         # just the string representation, which is not useful, so remove.
-        attrs.pop('dtype')
+        attrs.pop("dtype")
         # Make empty MoonLocation using the dtype and unit of the last column.
         # Use zeros so we do not get problems for possible conversion to
         # selenodetic coordinates.
-        shape = (length,) + attrs.pop('shape')
-        data = u.Quantity(np.zeros(shape=shape, dtype=cols[0].dtype),
-                          unit=cols[0].unit, copy=False)
+        shape = (length,) + attrs.pop("shape")
+        data = u.Quantity(
+            np.zeros(shape=shape, dtype=cols[0].dtype), unit=cols[0].unit, copy=False
+        )
         # Get arguments needed to reconstruct class
-        map = {key: (data[key] if key in 'xyz' else getattr(cols[-1], key))
-               for key in self._represent_as_dict_attrs}
+        map = {
+            key: (data[key] if key in "xyz" else getattr(cols[-1], key))
+            for key in self._represent_as_dict_attrs
+        }
         out = self._construct_from_dict(map)
         # Set remaining info attributes
         for attr, value in attrs.items():
@@ -100,8 +103,7 @@ class MoonLocation(u.Quantity):
     property.
     """
 
-    _location_dtype = np.dtype({'names': ['x', 'y', 'z'],
-                                'formats': [np.float64] * 3})
+    _location_dtype = np.dtype({"names": ["x", "y", "z"], "formats": [np.float64] * 3})
     _array_dtype = np.dtype((np.float64, (3,)))
 
     _lunar_radius = 1737.1e3  # m
@@ -110,7 +112,7 @@ class MoonLocation(u.Quantity):
 
     def __new__(cls, *args, **kwargs):
         # TODO: needs copy argument and better dealing with inputs.
-        if (len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], MoonLocation)):
+        if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], MoonLocation):
             return args[0].copy()
         try:
             self = cls.from_selenocentric(*args, **kwargs)
@@ -118,10 +120,11 @@ class MoonLocation(u.Quantity):
             try:
                 self = cls.from_selenodetic(*args, **kwargs)
             except Exception as exc_selenodetic:
-                raise TypeError('Coordinates could not be parsed as either '
-                                'selenocentric or selenodetic, with respective '
-                                'exceptions "{}" and "{}"'
-                                .format(exc_selenocentric, exc_selenodetic))
+                raise TypeError(
+                    "Coordinates could not be parsed as either "
+                    "selenocentric or selenodetic, with respective "
+                    'exceptions "{}" and "{}"'.format(exc_selenocentric, exc_selenodetic)
+                )
         return self
 
     @classmethod
@@ -151,30 +154,34 @@ class MoonLocation(u.Quantity):
             try:
                 unit = x.unit
             except AttributeError:
-                raise TypeError("Selenocentric coordinates should be Quantities "
-                                "unless an explicit unit is given.")
+                raise TypeError(
+                    "Selenocentric coordinates should be Quantities "
+                    "unless an explicit unit is given."
+                )
         else:
             unit = u.Unit(unit)
 
-        if unit.physical_type != 'length':
-            raise u.UnitsError("Selenocentric coordinates should be in "
-                               "units of length.")
+        if unit.physical_type != "length":
+            raise u.UnitsError(
+                "Selenocentric coordinates should be in " "units of length."
+            )
 
         try:
             x = u.Quantity(x, unit, copy=False)
             y = u.Quantity(y, unit, copy=False)
             z = u.Quantity(z, unit, copy=False)
         except u.UnitsError:
-            raise u.UnitsError("Selenocentric coordinate units should all be "
-                               "consistent.")
+            raise u.UnitsError(
+                "Selenocentric coordinate units should all be " "consistent."
+            )
 
         x, y, z = np.broadcast_arrays(x, y, z)
         struc = np.empty(x.shape, cls._location_dtype)
-        struc['x'], struc['y'], struc['z'] = x, y, z
+        struc["x"], struc["y"], struc["z"] = x, y, z
         return super().__new__(cls, struc, unit, copy=False)
 
     @classmethod
-    def from_selenodetic(cls, lon, lat, height=0.):
+    def from_selenodetic(cls, lon, lat, height=0.0):
         """
         Location on the Moon, from latitude and longitude.
 
@@ -215,8 +222,10 @@ class MoonLocation(u.Quantity):
             height = u.Quantity(height, u.m, copy=False)
 
         if not lon.shape == lat.shape:
-            raise ValueError("Inconsistent quantity shapes: {}, {}".format(
-                str(lon.shape), str(lat.shape))
+            raise ValueError(
+                "Inconsistent quantity shapes: {}, {}".format(
+                    str(lon.shape), str(lat.shape)
+                )
             )
         # get selenocentric coordinates. Have to give one-dimensional array.
 
@@ -224,14 +233,13 @@ class MoonLocation(u.Quantity):
 
         Npts = lon.size
         xyz = np.zeros((Npts, 3))
-        xyz[:, 0] = ((lunar_radius + height) * np.cos(lat) * np.cos(lon))
-        xyz[:, 1] = ((lunar_radius + height) * np.cos(lat) * np.sin(lon))
-        xyz[:, 2] = ((lunar_radius + height) * np.sin(lat))
+        xyz[:, 0] = (lunar_radius + height) * np.cos(lat) * np.cos(lon)
+        xyz[:, 1] = (lunar_radius + height) * np.cos(lat) * np.sin(lon)
+        xyz[:, 2] = (lunar_radius + height) * np.sin(lat)
 
         xyz = np.squeeze(xyz)
 
-        self = xyz.ravel().view(cls._location_dtype,
-                                cls).reshape(xyz.shape[:-1])
+        self = xyz.ravel().view(cls._location_dtype, cls).reshape(xyz.shape[:-1])
         self._unit = u.meter
         return self.to(height.unit)
 
@@ -258,16 +266,16 @@ class MoonLocation(u.Quantity):
         """
         self_xyz = self.to(u.meter).view(self._array_dtype, np.ndarray)
         self_xyz = np.atleast_2d(self_xyz)
-        gps_p = np.sqrt(self_xyz[:, 0]**2 + self_xyz[:, 1]**2)
+        gps_p = np.sqrt(self_xyz[:, 0] ** 2 + self_xyz[:, 1] ** 2)
         lat = np.arctan2(self_xyz[:, 2], gps_p)
         lon = np.arctan2(self_xyz[:, 1], self_xyz[:, 0])
         height = np.linalg.norm(self_xyz, axis=1) - self._lunar_radius
 
         return GeodeticLocation(
-            Longitude(lon * u.radian, u.degree,
-                      wrap_angle=180. * u.degree, copy=False),
+            Longitude(lon * u.radian, u.degree, wrap_angle=180.0 * u.degree, copy=False),
             Latitude(lat * u.radian, u.degree, copy=False),
-            u.Quantity(height * u.meter, self.unit, copy=False))
+            u.Quantity(height * u.meter, self.unit, copy=False),
+        )
 
     @property
     def lon(self):
@@ -296,27 +304,31 @@ class MoonLocation(u.Quantity):
 
     def get_mcmf(self, obstime=None):
         """
-        Generates an `~astropy.coordinates.ITRS` object with the location of
+        Generates a `~lunarsky.mcmf.MCMF` object with the location of
         this object at the requested ``obstime``.
 
         Parameters
         ----------
-        obstime : `~astropy.time.Time` or None
-            The ``obstime`` to apply to the new `~astropy.coordinates.ITRS`, or
+        obstime : `~lunarsky.time.Time` or None
+            The ``obstime`` to apply to the new `~lunarsky.mcmf.MCMF`, or
             if None, the default ``obstime`` will be used.
 
         Returns
         -------
-        itrs : `~astropy.coordinates.ITRS`
-            The new object in the ITRS frame
+        mcmf : `~lunarsky.mcmf.MCMF`
+            The new object in the MCMF frame
         """
         # do this here to prevent a series of complicated circular imports
         from . import MCMF
+
         return MCMF(x=self.x, y=self.y, z=self.z, obstime=obstime)
 
-    mcmf = property(get_mcmf, doc="""An `~astropy.coordinates.MCMF` object  with
+    mcmf = property(
+        get_mcmf,
+        doc="""An `~astropy.coordinates.MCMF` object  with
                                      for the location of this object at the
-                                     default ``obstime``.""")
+                                     default ``obstime``.""",
+    )
 
     def get_mcmf_posvel(self, obstime):
         """
@@ -338,23 +350,23 @@ class MoonLocation(u.Quantity):
         # MCMF position
         mcmf_data = self.get_mcmf(obstime).data
         obspos = mcmf_data.without_differentials()
-        obsvel = mcmf_data.differentials['s'].to_cartesian()
+        obsvel = mcmf_data.differentials["s"].to_cartesian()
         return obspos, obsvel
 
     @property
     def x(self):
         """The X component of the selenocentric coordinates."""
-        return self['x']
+        return self["x"]
 
     @property
     def y(self):
         """The Y component of the selenocentric coordinates."""
-        return self['y']
+        return self["y"]
 
     @property
     def z(self):
         """The Z component of the selenocentric coordinates."""
-        return self['z']
+        return self["z"]
 
     def __getitem__(self, item):
         result = super().__getitem__(item)
@@ -368,7 +380,7 @@ class MoonLocation(u.Quantity):
 
     def __len__(self):
         if self.shape == ():
-            raise IndexError('0-d MoonLocation arrays cannot be indexed')
+            raise IndexError("0-d MoonLocation arrays cannot be indexed")
         else:
             return super().__len__()
 
@@ -430,9 +442,11 @@ class MoonLocationAttribute(Attribute):
             # we have to do the import here because of some tricky circular deps
             from . import MCMF
 
-            if not hasattr(value, 'transform_to'):
-                raise ValueError('"{}" was passed into a '
-                                 'MoonLocationAttribute, but it does not have '
-                                 '"transform_to" method'.format(value))
-            mcmfobj = value.transform_to(MCMF)
+            if not hasattr(value, "transform_to"):
+                raise ValueError(
+                    '"{}" was passed into a '
+                    "MoonLocationAttribute, but it does not have "
+                    '"transform_to" method'.format(value)
+                )
+            mcmfobj = value.transform_to(MCMF())
             return mcmfobj.moon_location, True

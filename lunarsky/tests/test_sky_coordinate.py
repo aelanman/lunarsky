@@ -1,6 +1,4 @@
-
 import numpy as np
-import lunarsky.tests as ltest
 
 from astropy.coordinates import ICRS, GCRS, EarthLocation, AltAz
 from astropy.time import Time
@@ -10,14 +8,13 @@ from lunarsky import MoonLocation, SkyCoord, LunarTopo, MCMF
 # Check that the changes to SkyCoord don't cause unexpected behavior.
 
 
-def test_skycoord_transforms():
+def test_skycoord_transforms(grcat):
     # An EarthLocation object should still get copied over
     # under transformations.
 
     eloc = EarthLocation.from_geodetic(0.0, 10.0)
-    coords = ltest.get_catalog()
 
-    altaz = coords.transform_to(AltAz(location=eloc, obstime=Time.now()))
+    altaz = grcat.transform_to(AltAz(location=eloc, obstime=Time.now()))
 
     assert altaz.location == eloc
 
@@ -39,19 +36,19 @@ def test_skycoord_with_lunar_frames():
     azs = np.random.uniform(0, 2 * np.pi, Nsrcs)
     t0 = Time.now()
     loc = MoonLocation.from_selenodetic(0, 0)
-    src = SkyCoord(alt=alts, az=azs, unit='rad', frame='lunartopo',
-                   obstime=t0, location=loc)
+    src = SkyCoord(
+        alt=alts, az=azs, unit="rad", frame="lunartopo", obstime=t0, location=loc
+    )
 
     assert src.location == loc
     assert isinstance(src.frame, LunarTopo)
-    x, y, z = src.transform_to('mcmf').cartesian.xyz
-    src2 = SkyCoord(x=x, y=y, z=z, frame='mcmf',
-                    obstime=t0, location=loc)
+    x, y, z = src.transform_to("mcmf").cartesian.xyz
+    src2 = SkyCoord(x=x, y=y, z=z, frame="mcmf", obstime=t0, location=loc)
 
     assert isinstance(src2.frame, MCMF)
 
-    icrs2 = src2.transform_to('icrs')
-    icrs1 = src.transform_to('icrs')
+    icrs2 = src2.transform_to("icrs")
+    icrs1 = src.transform_to("icrs")
     assert np.allclose(icrs2.ra.deg, icrs1.ra.deg, atol=1e-5)
     assert np.allclose(icrs2.dec.deg, icrs1.dec.deg, atol=1e-5)
 
@@ -65,12 +62,14 @@ def test_earth_and_moon():
     azs = np.random.uniform(0, 2 * np.pi, Nsrcs)
     t0 = Time.now()
     loc = MoonLocation.from_selenodetic(0, 0)
-    src = SkyCoord(alt=alts, az=azs, unit='rad', frame='lunartopo',
-                   obstime=t0, location=loc)
+    src = SkyCoord(
+        alt=alts, az=azs, unit="rad", frame="lunartopo", obstime=t0, location=loc
+    )
 
     eloc = EarthLocation.from_geodetic(0, 0)
-    src2 = SkyCoord(alt=alts, az=azs, unit='rad', frame='altaz',
-                    obstime=t0, location=eloc)
+    src2 = SkyCoord(
+        alt=alts, az=azs, unit="rad", frame="altaz", obstime=t0, location=eloc
+    )
 
-    src.transform_to('icrs')
-    src2.transform_to('icrs')
+    src.transform_to("icrs")
+    src2.transform_to("icrs")
