@@ -1,8 +1,7 @@
 from astropy.coordinates.baseframe import frame_transform_graph
 from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
-from astropy.coordinates import AltAz, ICRS, EarthLocation
+from astropy.coordinates import AltAz, ICRS, EarthLocation, Angle
 from astropy.utils.data import download_files_in_parallel
-from astropy.tests.helper import assert_quantity_allclose
 import lunarsky
 import lunarsky.spice_utils as spice_utils
 from lunarsky.time import Time
@@ -93,9 +92,8 @@ def test_spice_earth(grcat):
     frame_transform_graph.remove_transform(ICRS, AltAz, None)
 
     # Compare astropy topocentric coordinate transform results to
-    assert_quantity_allclose(altaz.alt, altaz2.alt, atol="25arcsec")
-    assert_quantity_allclose(altaz.az, altaz2.az, atol="8arcmin")
-    # TODO Above tolerance is high due to some issue near zenith. Investigate.
+    assert all(altaz.separation(altaz2) < Angle("25arcsec"))
+    # NOTE Large deviations in azimuth high altitudes.
 
 
 def test_topo_kernel_setup():
