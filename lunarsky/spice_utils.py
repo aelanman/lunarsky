@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import tempfile
 from astropy.utils.data import download_files_in_parallel
 from astropy.coordinates.matrix_utilities import rotation_matrix
 from astropy.time import Time
@@ -12,6 +13,8 @@ from .data import DATA_PATH
 
 _J2000 = Time("J2000")
 LSP_ID = 98  # Lunar surface point ID
+
+TEMPORARY_KERNEL_DIR = tempfile.TemporaryDirectory()
 
 
 def check_is_loaded(search):
@@ -102,14 +105,15 @@ def lunar_surface_ephem(latitude, longitude, lsp_id=LSP_ID):
     states = np.zeros((len(ets), 6))
     states[:, :3] = np.repeat(pos_mcmf[None, :], len(ets), axis=0)
 
-    fname = os.path.join(DATA_PATH, "current_lunar_point.bsp")
-    if os.path.exists(fname):
-        os.remove(fname)
-    handle = spice.spkopn(fname, "SPK_file", 0)
     point_id = fm_center_id
     center = 301
     frame = "MOON_ME"
     degree = 1
+
+    fname = os.path.join(TEMPORARY_KERNEL_DIR.name, "current_lunar_point.bsp")
+    if os.path.exists(fname):
+        os.remove(fname)
+    handle = spice.spkopn(fname, "SPK_FILE", 0)
     spice.spkw09(
         handle,
         point_id,
@@ -124,8 +128,7 @@ def lunar_surface_ephem(latitude, longitude, lsp_id=LSP_ID):
         ets.tolist(),
     )
     spice.spkcls(handle)
-
-    return fname
+    spice.furnsh(fname)
 
 
 def topo_frame_def(latitude, longitude, moon=True):

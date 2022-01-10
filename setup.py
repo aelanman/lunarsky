@@ -24,7 +24,7 @@ setup_args = {
     "use_scm_version": {
         "root": ".",
         "relative_to": __file__,
-        "local_scheme": "guess-next-dev",
+        "local_scheme": "no-local-version",
         "write_to": "lunarsky/version.py",
     },
     "include_package_data": True,

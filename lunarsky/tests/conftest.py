@@ -3,7 +3,7 @@ from astropy.coordinates import SkyCoord
 import pytest
 import warnings
 
-# Ignore a deprecation from spiceypy
+# Ignore deprecation warnings from spiceypy
 @pytest.fixture(autouse=True)
 def ignore_representation_deprecation():
     warnings.filterwarnings(
