@@ -102,8 +102,7 @@ def _spice_setup(latitude, longitude):
         latlon = spice.gcpool("TOPO_LAT_LON", 0, 8)
         loadnew = not latlon == ["{:.4f}".format(ll) for ll in [latitude, longitude]]
     if loadnew:
-        spk = lunar_surface_ephem(latitude, longitude)
-        spice.furnsh(spk)
+        lunar_surface_ephem(latitude, longitude)  # Furnishes SPK for lunar surface point
         station_name, idnum, frame_specs, latlon = topo_frame_def(
             latitude, longitude, moon=True
         )
