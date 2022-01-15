@@ -9,9 +9,10 @@ import pytest
 
 # Lunar station positions
 Nangs = 3
-latitudes = np.linspace(0, 90, Nangs)
+latitudes = np.linspace(-90, 90, Nangs)
 longitudes = np.linspace(0, 360, Nangs)
-latlons = [(lat, lon) for lon in longitudes for lat in latitudes]
+latlons_grid = [(lat, lon) for lon in longitudes for lat in latitudes]
+
 
 # Times
 t0 = Time("2010-10-28T15:30:00")
@@ -25,7 +26,7 @@ et_4mo = (jd_4mo - _J2000).sec
 
 
 @pytest.mark.parametrize("time", jd_10yr)
-@pytest.mark.parametrize("lat,lon", latlons)
+@pytest.mark.parametrize("lat,lon", latlons_grid)
 def test_icrs_to_mcmf(time, lat, lon, grcat):
     # Check that the following transformation paths are equivalent:
     #   ICRS -> MCMF -> TOPO
@@ -64,7 +65,7 @@ def test_transform_loops(obj, path):
 
 
 @pytest.mark.parametrize("time", jd_10yr)
-@pytest.mark.parametrize("lat,lon", latlons)
+@pytest.mark.parametrize("lat,lon", latlons_grid)
 def test_topo_transform_loop(time, lat, lon, grcat):
     # Testing remaining transformations
     height = 10.0  # m
@@ -119,7 +120,7 @@ def test_earth_from_moon():
 
 def test_multi_times():
     # Check vectorization over time axis for LunarTopo transformations
-    lat, lon = latlons[6]
+    lat, lon = latlons_grid[6]
     loc = lunarsky.MoonLocation.from_selenodetic(lon, lat, height=10)
     star = lunarsky.SkyCoord(ra=[35], dec=[17], unit="deg", frame="icrs")
     topo0 = star.transform_to(lunarsky.LunarTopo(location=loc, obstime=jd_4mo))
