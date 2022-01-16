@@ -2,6 +2,7 @@ from lunarsky.time import Time, TimeDelta
 import astropy.coordinates as ac
 from astropy import units as un
 from astropy.tests.helper import assert_quantity_allclose
+import astropy
 import lunarsky
 import numpy as np
 import pytest
@@ -15,7 +16,7 @@ latlons_grid = [(lat, lon) for lon in longitudes for lat in latitudes]
 
 
 # Times
-t0 = Time("2010-10-28T15:30:00")
+t0 = Time("2025-10-28T15:30:00")
 _J2000 = Time("J2000")
 
 jd_10yr = Time(t0.jd + np.linspace(0, 10 * 365.25, 5), format="jd")
@@ -46,13 +47,21 @@ def test_icrs_to_mcmf(time, lat, lon, grcat):
     ],
 )
 @pytest.mark.parametrize("path", [["lunartopo"], ["mcmf"], ["lunartopo", "mcmf"]])
-def test_transform_loops(obj, path):
+@pytest.mark.parametrize(
+    "time, lat, lon",
+    [
+        (t0, 11.2, 1.4),
+        (t0, [10.3, 11.2], [0.0, 1.4]),
+        (jd_4mo[:2], 10.3, 0.0),
+        (jd_4mo[:2], [10.3, 11.2], [0.0, 1.4]),
+    ],
+)
+def test_transform_loops(obj, path, time, lat, lon):
     # Tests from ICRS -> path -> ICRS
-    t0 = Time("2025-05-30T03:30:19.00")
-    loc = lunarsky.MoonLocation.from_selenodetic(10, 87)
+    loc = lunarsky.MoonLocation.from_selenodetic(lat, lon)
     fdict = {
-        "lunartopo": lunarsky.LunarTopo(location=loc, obstime=t0),
-        "mcmf": lunarsky.MCMF(obstime=t0),
+        "lunartopo": lunarsky.LunarTopo(location=loc, obstime=time),
+        "mcmf": lunarsky.MCMF(obstime=time),
     }
     orig_pos = obj.cartesian.xyz.copy()
 
@@ -60,8 +69,20 @@ def test_transform_loops(obj, path):
         obj = obj.transform_to(fdict[fr])
     # Lastly, back to ICRS
     obj = obj.transform_to(ac.ICRS())
+    if obj.ndim == 1:
+        obj = obj[0]
     tol = 1e-4 if (obj.spherical.distance.unit == un.one) else 1 * un.m
     assert_quantity_allclose(obj.cartesian.xyz, orig_pos, atol=tol)
+
+
+def test_topo_to_topo():
+    # Check that zenith source transforms properly
+    loc0 = lunarsky.MoonLocation.from_selenodetic(lat=0, lon=90)
+    loc1 = lunarsky.MoonLocation.from_selenodetic(lat=0, lon=0)
+
+    src = lunarsky.SkyCoord(alt="90d", az="0d", frame="lunartopo", location=loc0)
+    new = src.transform_to(lunarsky.LunarTopo(location=loc1))
+    assert new.az.deg == 90
 
 
 @pytest.mark.parametrize("time", jd_10yr)
@@ -180,3 +201,56 @@ def test_nearby_obj_transforms(toframe, loc):
 
     res = sun_gcrs.transform_to(frame).transform_to(ac.GCRS(obstime=jd_4mo))
     assert_quantity_allclose(sun_gcrs.cartesian.xyz, res.cartesian.xyz)
+
+
+@pytest.mark.parametrize(
+    "Nt, Nl, success",
+    [
+        (2, 1, True),
+        (1, 2, True),
+        (2, 2, True),
+        (2, 3, False),
+        (3, 2, False),
+    ],
+)
+def test_incompatible_shape_error(Nt, Nl, success):
+    # Transforming to lunartopo
+
+    latlons_sel = np.array(latlons_grid[:Nl]).T
+    locs = lunarsky.MoonLocation.from_selenodetic(
+        lat=latlons_sel[0] * un.deg, lon=latlons_sel[1] * un.deg
+    )
+
+    times = Time.now() + TimeDelta(np.linspace(0, 10, Nt), format="sec")
+
+    if success:
+        lunarsky.LunarTopo(location=locs, obstime=times)
+    else:
+        with pytest.raises(ValueError, match="non-scalar attributes"):
+            lunarsky.LunarTopo(location=locs, obstime=times)
+
+
+@pytest.mark.parametrize("fromframe", ["icrs", "mcmf"])
+def test_incompatible_transform(fromframe):
+    Nl = 3
+    Nt = 1
+    Ns = 5
+    latlons_sel = np.array(latlons_grid[:Nl]).T
+    locs = lunarsky.MoonLocation.from_selenodetic(
+        lat=latlons_sel[0] * un.deg, lon=latlons_sel[1] * un.deg
+    )
+
+    times = Time.now() + TimeDelta(np.linspace(0, 10, Nt), format="sec")
+    ltop = lunarsky.LunarTopo(location=locs, obstime=times)
+
+    fromframe = ac.frame_transform_graph.lookup_name(fromframe)
+    coo = fromframe().realize_frame(
+        ac.SphericalRepresentation(
+            lat=np.linspace(-10, 10, Ns) * un.deg,
+            lon=np.linspace(30, 40, Ns) * un.deg,
+            distance=1,
+        )
+    )
+    src = lunarsky.SkyCoord(coo)
+    with pytest.raises(astropy.utils.shapes.IncompatibleShapeError):
+        src.transform_to(ltop)

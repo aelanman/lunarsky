@@ -29,8 +29,7 @@ import spiceypy as spice
 _90DEG = 90 * un.deg
 __all__ = ["LunarTopo"]
 
-_J2000 = Time("J2000")
-DEFAULT_OBSTIME = Time("J2000", scale="tt")
+_J2000 = Time("J2000", scale="tt")
 
 doc_components = """
     az : `~astropy.coordinates.Angle`, optional, must be keyword
@@ -70,7 +69,7 @@ class LunarTopo(BaseCoordinateFrame):
     default_representation = SphericalRepresentation
     default_differential = SphericalCosLatDifferential
 
-    obstime = TimeAttribute(default=DEFAULT_OBSTIME)
+    obstime = TimeAttribute(default=_J2000)
     location = MoonLocationAttribute(default=None)
 
     def __init__(self, *args, **kwargs):
@@ -104,10 +103,10 @@ def _spice_setup(latitude, longitude, station_id):
         frameloaded = check_is_loaded(f"*LUNAR-TOPO-{sid}*")
         if not frameloaded:
             lunar_surface_ephem(
-                latitude, longitude, station_num=sid
+                lat, lon, station_num=sid
             )  # Furnishes SPK for lunar surface point
             station_name, idnum, frame_specs, latlon = topo_frame_def(
-                latitude, longitude, moon=True, station_num=sid
+                lat, lon, moon=True, station_num=sid
             )
             frame_strs = ["{}={}".format(k, v) for (k, v) in frame_specs.items()]
             spice.lmpool(frame_strs)
@@ -133,7 +132,8 @@ def icrs_to_lunartopo(icrs_coo, topo_frame):
 
     icrs_coo_cart = icrs_coo.cartesian
 
-    ets = np.atleast_1d(ets)
+    ets_ids = np.atleast_2d(np.stack(np.broadcast_arrays(ets, stat_ids)).T)
+
     if not is_unitspherical:
         # For positions in the solar system.
 
@@ -141,22 +141,22 @@ def icrs_to_lunartopo(icrs_coo, topo_frame):
         lsp_icrs_posvel = (
             np.asarray(
                 [
-                    [
-                        spice.spkgeo(stat_id + 301000, et, "J2000", 0)[0]
-                        for stat_id in stat_ids
-                    ]
-                    for et in ets
+                    spice.spkgeo(int(stat_id) + 301000, et, "J2000", 0)[0]
+                    for (et, stat_id) in ets_ids
                 ]
             )
             * un.km
-        ).squeeze()
+        )
         icrs_coo_cart -= CartesianRepresentation(
             (lsp_icrs_posvel.T)[:3]  # 0-2=pos, 3-5=vel
         )
 
-    mats = np.stack(
-        [_make_mats(ets, "J2000", f"LUNAR-TOPO-{stat}") for stat in stat_ids]
-    ).squeeze()
+    mats = np.asarray(
+        [
+            spice.pxform("J2000", f"LUNAR-TOPO-{int(stat_id)}", et)
+            for (et, stat_id) in ets_ids
+        ]
+    )
     newrepr = icrs_coo_cart.transform(mats)
 
     newrepr = newrepr.reshape(shape_out)
@@ -181,27 +181,28 @@ def lunartopo_to_icrs(topo_coo, icrs_frame):
         isinstance(topo_coo.data, UnitSphericalRepresentation)
         or topo_coo.cartesian.x.unit == un.one
     )
-    ets = np.atleast_1d(ets)
-    mats = np.stack(
-        [_make_mats(ets, f"LUNAR-TOPO-{stat}", "J2000") for stat in stat_ids]
-    ).squeeze()
+
+    ets_ids = np.atleast_2d(np.stack(np.broadcast_arrays(ets, stat_ids)).T)
+
+    mats = np.asarray(
+        [
+            spice.pxform(f"LUNAR-TOPO-{int(stat_id)}", "J2000", et)
+            for (et, stat_id) in ets_ids
+        ]
+    )
     newrepr = topo_coo.cartesian.transform(mats)
     if not is_unitspherical:
         # For positions in the solar system.
 
-        # ICRS position of lunar surface point wrt solar system barycenter.
         lsp_icrs_posvel = (
             np.asarray(
                 [
-                    [
-                        spice.spkgeo(stat_id + 301000, et, "J2000", 0)[0]
-                        for stat_id in stat_ids
-                    ]
-                    for et in ets
+                    spice.spkgeo(int(stat_id) + 301000, et, "J2000", 0)[0]
+                    for (et, stat_id) in ets_ids
                 ]
             )
             * un.km
-        ).squeeze()
+        )
         newrepr += CartesianRepresentation((lsp_icrs_posvel.T)[:3])  # 0-2=pos, 3-5=vel
 
     newrepr = newrepr.reshape(shape_out)
@@ -226,7 +227,9 @@ def mcmf_to_lunartopo(mcmf_coo, topo_frame):
         isinstance(mcmf_coo.data, UnitSphericalRepresentation)
         or mcmf_coo.cartesian.x.unit == un.one
     )
-    ets = np.atleast_1d(ets)
+
+    ets_ids = np.atleast_2d(np.stack(np.broadcast_arrays(ets, stat_ids)).T)
+
     mcmf_coo_cart = mcmf_coo.cartesian
     if not is_unitspherical:
         # For positions in the solar system.
@@ -234,25 +237,24 @@ def mcmf_to_lunartopo(mcmf_coo, topo_frame):
         lsp_mcmf_posvel = (
             np.asarray(
                 [
-                    [
-                        spice.spkgeo(stat_id + 301000, et, "MOON_ME", 301)[0]
-                        for stat_id in stat_ids
-                    ]
-                    for et in ets
+                    spice.spkgeo(int(stat_id) + 301000, et, "MOON_ME", 301)[0]
+                    for (et, stat_id) in ets_ids
                 ]
             )
             * un.km
-        ).squeeze()
+        )
         mcmf_coo_cart -= CartesianRepresentation(
             (lsp_mcmf_posvel.T)[:3]  # 0-2=pos, 3-5=vel
         )
 
-    mats = np.stack(
-        [_make_mats(ets, "MOON_ME", f"LUNAR-TOPO-{stat}") for stat in stat_ids]
-    ).squeeze()
-    newrepr = mcmf_coo_cart.transform(mats)
+    mats = np.asarray(
+        [
+            spice.pxform("MOON_ME", f"LUNAR-TOPO-{int(stat_id)}", et)
+            for (et, stat_id) in ets_ids
+        ]
+    )
 
-    newrepr = newrepr.reshape(shape_out)
+    newrepr = mcmf_coo_cart.transform(mats).reshape(shape_out)
 
     return topo_frame.realize_frame(newrepr)
 
@@ -270,13 +272,15 @@ def lunartopo_to_mcmf(topo_coo, mcmf_frame):
         isinstance(topo_coo.data, UnitSphericalRepresentation)
         or topo_coo.cartesian.x.unit == un.one
     )
-    ets = np.atleast_1d(ets)
-    mats = np.stack(
+
+    ets_ids = np.atleast_2d(np.stack(np.broadcast_arrays(ets, stat_ids)).T)
+
+    mats = np.asarray(
         [
-            spice.pxform(f"LUNAR-TOPO-{stat}", "MOON_ME", 0)
-            for stat in topo_coo.location.station_ids
+            spice.pxform(f"LUNAR-TOPO-{int(stat_id)}", "MOON_ME", et)
+            for (et, stat_id) in ets_ids
         ]
-    ).squeeze()
+    )
     newrepr = topo_coo.cartesian.transform(mats)
 
     if not is_unitspherical:
@@ -286,11 +290,8 @@ def lunartopo_to_mcmf(topo_coo, mcmf_frame):
         lsp_mcmf_posvel = (
             np.asarray(
                 [
-                    [
-                        spice.spkgeo(stat_id + 301000, et, "MOON_ME", 301)[0]
-                        for stat_id in stat_ids
-                    ]
-                    for et in ets
+                    spice.spkgeo(int(stat_id) + 301000, et, "MOON_ME", 301)[0]
+                    for (et, stat_id) in ets_ids
                 ]
             )
             * un.km
