@@ -1,8 +1,8 @@
 from lunarsky.time import Time, TimeDelta
 import astropy.coordinates as ac
 from astropy import units as un
+from astropy.utils import IncompatibleShapeError
 from astropy.tests.helper import assert_quantity_allclose
-import astropy
 import lunarsky
 import numpy as np
 import pytest
@@ -75,10 +75,6 @@ def test_transform_loops(obj, path, time, lat, lon):
     assert_quantity_allclose(obj.cartesian.xyz, orig_pos, atol=tol)
 
 
-@pytest.mark.skipif(
-    astropy.version.major < 5,
-    reason="_add_merged_transform unavailable for astropy.version < 5",
-)
 def test_topo_to_topo():
     # Check that zenith source transforms properly
     loc0 = lunarsky.MoonLocation.from_selenodetic(lat=0, lon=90)
@@ -256,5 +252,5 @@ def test_incompatible_transform(fromframe):
         )
     )
     src = lunarsky.SkyCoord(coo)
-    with pytest.raises(astropy.utils.shapes.IncompatibleShapeError):
+    with pytest.raises(IncompatibleShapeError):
         src.transform_to(ltop)

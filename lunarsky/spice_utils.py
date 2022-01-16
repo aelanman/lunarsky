@@ -207,6 +207,10 @@ def remove_topo(station_num):
 
     frame_vars = [s.format(idnum, station_name, fm_center_id) for s in fmt_vars]
 
+    # Handle a glitch in spiceypy for older versions of numpy
+    if np.str_ is None:
+        return
+
     for var in frame_vars:
         spice.dvpool(var)
 

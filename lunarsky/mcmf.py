@@ -109,3 +109,12 @@ def mcmf_to_icrs(mcmf_coo, icrs_frame):
     if ets.shape != mcmf_coo.obstime.shape:
         newrepr = newrepr.reshape(mcmf_coo.shape)
     return icrs_frame.realize_frame(newrepr)
+
+
+@frame_transform_graph.transform(FunctionTransformWithFiniteDifference, MCMF, MCMF)
+def mcmf_to_mcmf(mcmf_coo, mcmf_frame):
+    if np.all(mcmf_coo.obstime == mcmf_frame.obstime):
+        return mcmf_frame.realize_frame(mcmf_coo.data)
+    else:
+        # Go through ICRS to ensure new time is accounted for.
+        return mcmf_coo.transform_to(ICRS).transform_to(mcmf_frame)
