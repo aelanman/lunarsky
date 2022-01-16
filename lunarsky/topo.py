@@ -6,7 +6,7 @@ from astropy.coordinates.representation import (
     UnitSphericalRepresentation,
     CartesianRepresentation,
 )
-from astropy.utils.shapes import check_broadcast
+import astropy
 from astropy.coordinates.baseframe import (
     BaseCoordinateFrame,
     base_doc,
@@ -24,6 +24,11 @@ from .moon import MoonLocationAttribute
 from .spice_utils import check_is_loaded, topo_frame_def, lunar_surface_ephem
 
 import spiceypy as spice
+
+if astropy.version.major >= 5:
+    from astropy.utils.shapes import check_broadcast  # noqa
+else:
+    from astropy.utils.misc import check_broadcast  # noqa
 
 
 _90DEG = 90 * un.deg
@@ -303,4 +308,5 @@ def lunartopo_to_mcmf(topo_coo, mcmf_frame):
 
 
 # Enable Topo -> Topo transformations (such that the obstime or location can change)
-frame_transform_graph._add_merged_transform(LunarTopo, MCMF, LunarTopo)
+if astropy.version.major >= 5:
+    frame_transform_graph._add_merged_transform(LunarTopo, MCMF, LunarTopo)

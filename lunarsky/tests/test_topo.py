@@ -75,6 +75,10 @@ def test_transform_loops(obj, path, time, lat, lon):
     assert_quantity_allclose(obj.cartesian.xyz, orig_pos, atol=tol)
 
 
+@pytest.mark.skipif(
+    astropy.version.major < 5,
+    reason="_add_merged_transform unavailable for astropy.version < 5",
+)
 def test_topo_to_topo():
     # Check that zenith source transforms properly
     loc0 = lunarsky.MoonLocation.from_selenodetic(lat=0, lon=90)
