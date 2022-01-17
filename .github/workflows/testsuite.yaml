@@ -39,11 +39,14 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.8
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
       - name: cache-kernels
         uses: actions/cache@v2
         with:
           path: ~/ap_cache
-          key: "kernel_cache"
+          key: kernel_cache-${{ steps.date.outputs.date }}
       - name: Download and cache
         run: |
           pip install astropy
@@ -71,11 +74,14 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
       - name: load-cache
         uses: actions/cache@v2
         with:
           path: ~/ap_cache
-          key: "kernel_cache"
+          key: kernel_cache-${{ steps.date.outputs.date }}
       - name: load kernels
         run: |
           pip install astropy
