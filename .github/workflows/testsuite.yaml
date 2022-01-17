@@ -1,11 +1,8 @@
 name: Tests
 
 on:
-  push
-  #  pull_request:
-  #  types: [opened, synchronize]
+  pull_request:
 
-# Test suite configuration borrowed from github.com/RadioAstronomySoftwareGroup/pyuvsim
 jobs:
   linter:
     name: Linter
