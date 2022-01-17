@@ -1,8 +1,7 @@
 # lunarsky
 
 
-
-[![Build Status](https://travis-ci.org/aelanman/lunarsky.svg?branch=master)](https://travis-ci.org/aelanman/lunarsky)
+[![Build Status](https://github.com/aelanman/lunarsky/actions/workflows/testsuite.yaml/badge.svg)](https://github.com/aelanman/lunarsky/actions)
 [![codecov](https://codecov.io/gh/aelanman/lunarsky/branch/master/graph/badge.svg)](https://codecov.io/gh/aelanman/lunarsky)
 
 
