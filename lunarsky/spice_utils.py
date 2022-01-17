@@ -12,7 +12,6 @@ from .mcmf import MCMF
 from .data import DATA_PATH
 
 _J2000 = Time("J2000")
-LSP_ID = 98  # Lunar surface point ID
 
 TEMPORARY_KERNEL_DIR = tempfile.TemporaryDirectory()
 
@@ -71,30 +70,27 @@ def furnish_kernels():
     return kernel_paths
 
 
-def lunar_surface_ephem(latitude, longitude, lsp_id=LSP_ID):
+def lunar_surface_ephem(latitude, longitude, station_num=98):
     """
     Make an SPK for the point on the lunar surface
 
     Creates a temporary file and furnishes from that.
 
-    The ID of the lunar surface point is 1301098.
-
     Parameters
     ----------
     latitude: float
         Mean-Earth frame selenodetic latitude in degrees.
-
     longitude: float
         Mean-Earth frame selenodetic longitude in degrees.
+    station_num: int
+        Station number
 
     Returns
     -------
-    fname: str
-        Path to kernel file.
+    int:
+        Ephemeris ID number
     """
-    fm_center_id = 301000
-    station_num = lsp_id
-    fm_center_id += station_num
+    point_id = 301000 + station_num
 
     lat = np.radians(latitude)
     lon = np.radians(longitude)
@@ -105,15 +101,16 @@ def lunar_surface_ephem(latitude, longitude, lsp_id=LSP_ID):
     states = np.zeros((len(ets), 6))
     states[:, :3] = np.repeat(pos_mcmf[None, :], len(ets), axis=0)
 
-    point_id = fm_center_id
     center = 301
     frame = "MOON_ME"
     degree = 1
 
-    fname = os.path.join(TEMPORARY_KERNEL_DIR.name, "current_lunar_point.bsp")
+    fname = os.path.join(TEMPORARY_KERNEL_DIR.name, f"lunar_points.bsp")
     if os.path.exists(fname):
-        os.remove(fname)
-    handle = spice.spkopn(fname, "SPK_FILE", 0)
+        spice.unload(fname)
+        handle = spice.spkopa(fname)
+    else:
+        handle = spice.spkopn(fname, "SPK_FILE", 0)
     spice.spkw09(
         handle,
         point_id,
@@ -130,29 +127,28 @@ def lunar_surface_ephem(latitude, longitude, lsp_id=LSP_ID):
     spice.spkcls(handle)
     spice.furnsh(fname)
 
+    return point_id
 
-def topo_frame_def(latitude, longitude, moon=True):
+
+def topo_frame_def(latitude, longitude, station_num=98, moon=True):
     """
     Make a list of strings defining a topocentric frame. This can then be loaded
     with spiceypy.lmpool.
     """
-    global LSP_ID
-
     if moon:
         idnum = 1301000
-        station_name = "LUNAR-TOPO"
+        station_name = f"LUNAR-TOPO-{station_num}"
         relative = "MOON_ME"
     else:
+        # Used in tests only
         idnum = 1399000
-        station_name = "EARTH-TOPO"
+        station_name = f"EARTH-TOPO-{station_num}"
         relative = "ITRF93"
 
     # The DSS stations are built into SPICE, and they number up to 66.
     # We will call this station number 98.
-    station_num = LSP_ID
     idnum += station_num
     fm_center_id = idnum - 1000000
-    #    LSP_ID += 1
 
     ecef_to_enu = np.matmul(
         rotation_matrix(-longitude, "z", unit="deg"),
@@ -190,6 +186,39 @@ def topo_frame_def(latitude, longitude, moon=True):
     return station_name, idnum, frame_dict, latlon
 
 
+def remove_topo(station_num):
+    """Remove a lunar station, by number, from variable pool."""
+
+    idnum = 1301000 + station_num
+    fm_center_id = idnum - 1000000
+    station_name = f"LUNAR-TOPO-{station_num}"
+
+    fmt_vars = [
+        "FRAME_{1}",
+        "FRAME_{0}_NAME",
+        "FRAME_{0}_CLASS",
+        "FRAME_{0}_CLASS_ID",
+        "FRAME_{0}_CENTER",
+        "OBJECT_{2}_FRAME",
+        "TKFRAME_{0}_RELATIVE",
+        "TKFRAME_{0}_SPEC",
+        "TKFRAME_{0}_MATRIX",
+    ]
+
+    frame_vars = [s.format(idnum, station_name, fm_center_id) for s in fmt_vars]
+
+    # Handle a glitch in spiceypy for older versions of numpy
+    if np.str_ is None:
+        return
+
+    for var in frame_vars:
+        spice.dvpool(var)
+
+    # Ideally, one would also remove the ephemeris data for this station from
+    # the lunar_points.bsp file. This doesn't seem to be possible. However,
+    # the ephemeris _should_ be overwritten if the station_id is reused.
+
+
 def earth_pos_mcmf(obstimes):
     """
     Get the position of the Earth in the MCMF frame.
@@ -204,11 +233,6 @@ def earth_pos_mcmf(obstimes):
     )
     earthpos = unit.Quantity(earthpos.T, "km")
     return MCMF(*earthpos, obstime=obstimes)
-
-
-def cleanup():
-    # TODO Clear the kernel pool
-    return 0
 
 
 KERNEL_PATHS = furnish_kernels()

@@ -13,7 +13,7 @@ setup_args = {
     "name": "lunarsky",
     "author": "Adam E. Lanman",
     "url": "https://github.com/aelanman/lunarsky",
-    "download_url": "https://github.com/aelanman/lunarsky/archive/v0.0.1.tar.gz",
+    "download_url": "https://github.com/aelanman/lunarsky/archive/refs/tags/v0.1.1.tar.gz",
     "license": "BSD",
     "description": "Astropy support for selenocentric (Moon)"
     "reference frames and lunar surface observatories.",
@@ -24,6 +24,7 @@ setup_args = {
     "use_scm_version": {
         "root": ".",
         "relative_to": __file__,
+        "version_scheme": "post-release",
         "local_scheme": "no-local-version",
         "write_to": "lunarsky/version.py",
     },
