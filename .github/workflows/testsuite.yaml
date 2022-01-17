@@ -1,10 +1,6 @@
 name: Tests
 on:
   pull_request:
-    types:
-      - [opened, synchronize]
-
-# Test suite configuration borrowed from github.com/RadioAstronomySoftwareGroup/pyuvsim
 
 jobs:
   linter:
