@@ -4,9 +4,12 @@
 
 ## Added
 - Support for having multiple LunarTopo frames at once
+- Deletion of old LunarTopo frame variables from kernel pool when MoonLocation deleted
+- Cleaned up code in topo.py to reduce code duplication.
 
 ## Fixed
 - Transformations involving MoonLocation objects holding multiple positions.
+- Transformations from LunarTopo to LunarTopo (at a different place).
 
 ## Deprecated
 

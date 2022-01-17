@@ -1,12 +1,12 @@
+import numpy as np
+from copy import deepcopy
 from lunarsky.time import Time, TimeDelta
 import astropy.coordinates as ac
 from astropy import units as un
 from astropy.utils import IncompatibleShapeError
 from astropy.tests.helper import assert_quantity_allclose
 import lunarsky
-import numpy as np
 import pytest
-
 
 # Lunar station positions
 Nangs = 3
@@ -16,19 +16,16 @@ latlons_grid = [(lat, lon) for lon in longitudes for lat in latitudes]
 
 
 # Times
-t0 = Time("2025-10-28T15:30:00")
+t0 = Time("2020-10-28T15:30:00")
 _J2000 = Time("J2000")
 
 jd_10yr = Time(t0.jd + np.linspace(0, 10 * 365.25, 5), format="jd")
-et_10yr = (jd_10yr - _J2000).sec
-
 jd_4mo = t0 + TimeDelta(np.linspace(0, 4 * 28 * 24 * 3600.0, 100), format="sec")
-et_4mo = (jd_4mo - _J2000).sec
 
 
 @pytest.mark.parametrize("time", jd_10yr)
 @pytest.mark.parametrize("lat,lon", latlons_grid)
-def test_icrs_to_mcmf(time, lat, lon, grcat):
+def test_icrs_to_topo_long_time(time, lat, lon, grcat):
     # Check that the following transformation paths are equivalent:
     #   ICRS -> MCMF -> TOPO
     #   ICRS -> TOPO
@@ -42,7 +39,7 @@ def test_icrs_to_mcmf(time, lat, lon, grcat):
 @pytest.mark.parametrize(
     "obj",
     [
-        ac.get_sun(Time("2025-05-30T03:30:19.00")).transform_to(ac.ICRS),
+        ac.get_sun(t0).transform_to(ac.ICRS),
         ac.SkyCoord(ra="30d", dec="-70d", frame="icrs"),
     ],
 )
@@ -85,19 +82,22 @@ def test_topo_to_topo():
     assert new.az.deg == 90
 
 
-@pytest.mark.parametrize("time", jd_10yr)
-@pytest.mark.parametrize("lat,lon", latlons_grid)
-def test_topo_transform_loop(time, lat, lon, grcat):
-    # Testing remaining transformations
-    height = 10.0  # m
-    loc = lunarsky.MoonLocation.from_selenodetic(lon, lat, height)
-    topo0 = grcat.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
-    icrs0 = topo0.transform_to(ac.ICRS())
-    assert np.all(grcat.separation(icrs0) < ac.Angle("5arcsec"))
-
-    mcmf0 = topo0.transform_to(lunarsky.MCMF(obstime=time))
-    mcmf1 = grcat.transform_to(lunarsky.MCMF(obstime=time))
-    assert np.all(mcmf0.separation(mcmf1) < ac.Angle("5arcsec"))
+def test_mcmf_to_mcmf():
+    # Transform MCMF positions to MCMF frame half a lunar sidereal day later.
+    # Assert that the new positions are roughly close to 180 deg from the original.
+    src = lunarsky.SkyCoord(ra="0d", dec="0d", frame="icrs")
+    src = src.transform_to(lunarsky.MCMF(obstime=jd_10yr))
+    orig_pos = deepcopy(src)
+    src = src.transform_to(
+        lunarsky.MCMF(obstime=jd_10yr + TimeDelta(27.322 / 2, format="jd"))
+    )
+    sph0 = src.spherical
+    sph1 = orig_pos.spherical
+    res = ac.angle_utilities.angular_separation(
+        sph0.lon, sph0.lat, sph1.lon, sph1.lat
+    ).to("deg")
+    assert_quantity_allclose(res, 177 * un.deg, atol=5 * un.deg)
+    # Tolerance to allow for lunar precession / nutation.
 
 
 def test_earth_from_moon():
@@ -114,10 +114,18 @@ def test_earth_from_moon():
     assert all((lunar_perigee < dists) & (dists < lunar_apogee))
 
     # # Compare position of Earth in MCMF frame from astropy and from spice
-    epos_icrs = ac.SkyCoord(ac.get_body_barycentric("earth", jd_4mo), frame="icrs")
-    mcmf_ap = epos_icrs.transform_to(lunarsky.MCMF(obstime=jd_4mo)).frame
-    assert_quantity_allclose(mcmf_ap.cartesian.xyz, mcmf.cartesian.xyz, atol="5km")
+    epos_icrs_ap = ac.SkyCoord(ac.get_body_barycentric("earth", jd_4mo), frame="icrs")
+    epos_icrs_sp = ac.SkyCoord(mcmf).transform_to(ac.ICRS())
+    mcmf_ap = epos_icrs_ap.transform_to(lunarsky.MCMF(obstime=jd_4mo)).frame
+    assert_quantity_allclose(mcmf_ap.cartesian.xyz, mcmf.cartesian.xyz, atol="6km")
     #   TODO Lower this tolerance ^
+
+    # Whatever difference exists between the two positions should be the same in both ICRS
+    # and MCMF frames:
+    assert_quantity_allclose(
+        np.linalg.norm(epos_icrs_ap.cartesian.xyz - epos_icrs_sp.cartesian.xyz, axis=0),
+        np.linalg.norm(mcmf_ap.cartesian.xyz - mcmf.cartesian.xyz, axis=0),
+    )
 
     # Now test LunarTopo frame positions
     lat, lon = 0, 0  # deg
@@ -131,7 +139,7 @@ def test_earth_from_moon():
     # is consistent with the Moon's orbit.
     moonfreq = 1 / (28.0 * 24.0 * 3600.0)  # Hz, frequency of the moon's orbit
     _az = np.fft.fft(topo.az.deg)
-    ks = np.fft.fftfreq(jd_4mo.size, d=np.diff(et_4mo)[0])
+    ks = np.fft.fftfreq(jd_4mo.size, d=np.diff((jd_4mo - _J2000).sec)[0])
     sel = ks > 0
 
     closest = np.argmin(np.abs(moonfreq - ks[sel]))

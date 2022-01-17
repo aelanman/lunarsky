@@ -109,11 +109,9 @@ def _spice_setup(latitude, longitude, station_id):
             spice.lmpool(frame_strs)
 
 
-ap_to_spice = {"icrs": ("J2000", 0), "mcmf": ("MOON_ME", 301)}
-
-
 def make_transform(coo, toframe):
 
+    ap_to_spice = {"icrs": ("J2000", 0), "mcmf": ("MOON_ME", 301)}
     # Get target frame and source frame names
     if isinstance(coo, LunarTopo):
         totopo = False
@@ -158,7 +156,6 @@ def make_transform(coo, toframe):
     if not is_unitspherical:
         # Make origin vector(s) in coo's frame.
         if totopo:
-
             origin_id = lambda n: int(frame_id)  # MCMF or ICRS frame origin
             target_id = lambda n: int(n) + 301000  # Station ID
             frame_name = lambda n: frame_spice_name
