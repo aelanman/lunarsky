@@ -108,8 +108,6 @@ class SkyCoord(aSkyCoord):
         for attr in set(new_coord.get_frame_attr_names()) & set(frame_kwargs.keys()):
             frame_kwargs.pop(attr)
 
-        # print("!!!", self.frame)
-        # import IPython; IPython.embed()
         return self.__class__(new_coord, **frame_kwargs)
 
     def radial_velocity_correction(self, kind="barycentric", obstime=None, location=None):
