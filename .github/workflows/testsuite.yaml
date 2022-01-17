@@ -92,7 +92,7 @@ jobs:
           pip install .
       - name: Run Tests
         run: |
-          python -m pytest --cov=pyspherical --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+          python -m pytest --cov=lunarsky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
       - uses: codecov/codecov-action@v2
         if: matrix.os == 'ubuntu-latest' && success()
         with:
