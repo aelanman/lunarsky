@@ -1,34 +1,31 @@
 name: Tests
+
 on:
-  pull_request:
-    types:
-      - [opened, synchronize]
+  push
+  #  pull_request:
+  #  types: [opened, synchronize]
 
 # Test suite configuration borrowed from github.com/RadioAstronomySoftwareGroup/pyuvsim
-
 jobs:
   linter:
     name: Linter
     runs-on: ubuntu-latest
     env:
       ENV_NAME: linting
-      PYTHON: 3.7
+      PYTHON: 3.8
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
         with:
          fetch-depth: 1
-      - name: Get Miniconda Linux
-        run: |
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
-          bash $HOME/miniconda.sh -b -p $HOME/miniconda
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
       - name: Setup Environment
         run: |
-          export PATH="$HOME/miniconda/bin:$PATH"
-          ./ci/install_conda.sh
+          pip install pre-commit
       - name: Linting
         run: |
-          export PATH="$HOME/miniconda/bin:$PATH"
-          source activate ${ENV_NAME}
           pre-commit install
           pre-commit run -a
   tests:
@@ -44,38 +41,21 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         python-version: [3.6, 3.7, 3.8]
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 1
-
-      - name: Get Miniconda MacOSX
-        if: matrix.os == 'macos-latest'
-        run: |
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O $HOME/miniconda.sh;
-          bash $HOME/miniconda.sh -b -p $HOME/miniconda
-          export PATH="$HOME/miniconda/bin:$PATH"
-          conda clean -i
-          conda clean --all -y -q
-      - name: Get Miniconda Linux
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
-          bash $HOME/miniconda.sh -b -p $HOME/miniconda
-      - name: Setup Environment
-        run: |
-          export PATH="$HOME/miniconda/bin:$PATH"
-          ./ci/install_conda.sh
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Install
         run: |
-          export PATH="$HOME/miniconda/bin:$PATH"
-          source activate ${ENV_NAME}
+          pip install pytest pytest-cov
           pip install .
       - name: Run Tests
         run: |
-          export PATH="$HOME/miniconda/bin:$PATH"
-          source activate $ENV_NAME
           python -m pytest --cov=pyspherical --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
-      - uses: codecov/codecov-action@master
+      - uses: codecov/codecov-action@v2
         if: matrix.os == 'ubuntu-latest' && success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
