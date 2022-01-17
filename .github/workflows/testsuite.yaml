@@ -3,8 +3,6 @@ on:
   pull_request:
     types:
       - [opened, synchronize]
-  pull_request_review:
-    types: [edited, dismissed]
 
 # Test suite configuration borrowed from github.com/RadioAstronomySoftwareGroup/pyuvsim
 
