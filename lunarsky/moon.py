@@ -1,11 +1,21 @@
 import numpy as np
+import copy
 from astropy import units as u
 from astropy.units.quantity import QuantityInfoBase
 from astropy.coordinates.angles import Longitude, Latitude
 from astropy.coordinates.earth import GeodeticLocation
+from astropy.coordinates.representation import (
+    CartesianRepresentation,
+    SphericalRepresentation,
+)
 from astropy.coordinates.attributes import Attribute
 
+from .spice_utils import remove_topo
+
 __all__ = ["MoonLocation", "MoonLocationAttribute"]
+
+
+_DEFAULT_SITE_ID = 98
 
 
 class MoonLocationInfo(QuantityInfoBase):
@@ -108,6 +118,16 @@ class MoonLocation(u.Quantity):
 
     _lunar_radius = 1737.1e3  # m
 
+    # Manage the set of defined ephemerides.
+    # Class attributes only
+    _existing_stat_ids = []
+    _existing_locs = []
+    _ref_count = []
+    _new_stat_id = _DEFAULT_SITE_ID  # Starting at 98
+
+    # This instance's station id(s)
+    station_ids = []
+
     info = MoonLocationInfo()
 
     def __new__(cls, *args, **kwargs):
@@ -125,7 +145,42 @@ class MoonLocation(u.Quantity):
                     "selenocentric or selenodetic, with respective "
                     'exceptions "{}" and "{}"'.format(exc_selenocentric, exc_selenodetic)
                 )
+        self = cls._set_site_id(self)
         return self
+
+    @classmethod
+    def _set_site_id(cls, inst):
+        """
+        Set the station ID number and manage registry of defined stations.
+        """
+        if inst.isscalar:
+            llh_arr = [
+                (
+                    inst.lon.deg.item(),
+                    inst.lat.deg.item(),
+                    inst.height.to_value("km").item(),
+                )
+            ]
+        else:
+            llh_arr = zip(inst.lon.deg, inst.lat.deg, inst.height.to_value("km"))
+        statids = []
+
+        for llh in llh_arr:
+            lonlatheight = "_".join(["{:.4f}".format(ll) for ll in llh])
+            if lonlatheight not in cls._existing_locs:
+                cls._existing_locs.append(lonlatheight)
+                statids.append(cls._new_stat_id)
+                cls._existing_stat_ids.append(cls._new_stat_id)
+                cls._new_stat_id += 1
+                cls._ref_count.append(1)
+                if cls._new_stat_id >= 999:
+                    raise ValueError("Too many MoonLocation objects open at once. ")
+            else:
+                ind = cls._existing_locs.index(lonlatheight)
+                cls._ref_count[ind] += 1
+                statids.append(cls._existing_stat_ids[ind])
+        inst.station_ids = statids
+        return inst
 
     @classmethod
     def from_selenocentric(cls, x, y, z, unit=None):
@@ -178,7 +233,11 @@ class MoonLocation(u.Quantity):
         x, y, z = np.broadcast_arrays(x, y, z)
         struc = np.empty(x.shape, cls._location_dtype)
         struc["x"], struc["y"], struc["z"] = x, y, z
-        return super().__new__(cls, struc, unit, copy=False)
+        inst = super().__new__(cls, struc, unit, copy=False)
+
+        inst = cls._set_site_id(inst)
+
+        return inst
 
     @classmethod
     def from_selenodetic(cls, lon, lat, height=0.0):
@@ -241,10 +300,43 @@ class MoonLocation(u.Quantity):
 
         self = xyz.ravel().view(cls._location_dtype, cls).reshape(xyz.shape[:-1])
         self._unit = u.meter
-        return self.to(height.unit)
+        inst = self.to(height.unit)
+
+        return cls._set_site_id(inst)
 
     def __str__(self):
         return self.__repr__()
+
+    def copy(self):
+        # Necessary to preserve station_ids list
+        c = super().copy()
+        c.station_ids = self.station_ids
+        return c
+
+    def __copy__(self):
+        # Ensure that the station_ids are copied as well under shallow copy
+        obj = copy.copy(super())
+        obj.station_ids = self.station_ids
+        return obj
+
+    def __del__(self):
+        # Remove this MoonLocation's station_ids from _existing_stat_ids and
+        # locations from _existing_locs.
+        # Also clear the corresponding frames from spice variable pool.
+
+        for si, stat_id in enumerate(self.station_ids):
+            try:
+                ind = self.__class__._existing_stat_ids.index(stat_id)
+            except ValueError:
+                continue
+            count = self.__class__._ref_count[ind]
+            if count == 1:
+                self.__class__._existing_stat_ids.pop(ind)
+                self.__class__._existing_locs.pop(ind)
+                remove_topo(stat_id)
+                self.__class__._ref_count.pop(ind)
+            else:
+                self.__class__._ref_count[ind] -= 1
 
     @property
     def selenodetic(self):
@@ -264,17 +356,16 @@ class MoonLocation(u.Quantity):
             `~astropy.coordinates.Latitude`, and `~astropy.units.Quantity`
 
         """
-        self_xyz = self.to(u.meter).view(self._array_dtype, np.ndarray)
-        self_xyz = np.atleast_2d(self_xyz)
-        gps_p = np.sqrt(self_xyz[:, 0] ** 2 + self_xyz[:, 1] ** 2)
-        lat = np.arctan2(self_xyz[:, 2], gps_p)
-        lon = np.arctan2(self_xyz[:, 1], self_xyz[:, 0])
-        height = np.linalg.norm(self_xyz, axis=1) - self._lunar_radius
-
+        xyz = self.view(self._array_dtype, u.Quantity)
+        lld = CartesianRepresentation(xyz, xyz_axis=-1, copy=False).represent_as(
+            SphericalRepresentation
+        )
         return GeodeticLocation(
-            Longitude(lon * u.radian, u.degree, wrap_angle=180.0 * u.degree, copy=False),
-            Latitude(lat * u.radian, u.degree, copy=False),
-            u.Quantity(height * u.meter, self.unit, copy=False),
+            Longitude(lld.lon, u.degree, wrap_angle=180.0 * u.degree, copy=False),
+            Latitude(lld.lat, u.degree, copy=False),
+            u.Quantity(
+                lld.distance - (self._lunar_radius * u.meter), self.unit, copy=False
+            ),
         )
 
     @property

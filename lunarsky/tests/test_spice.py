@@ -107,8 +107,12 @@ def test_topo_kernel_setup():
     for filepath in lunarsky.spice_utils.KERNEL_PATHS:
         spice.furnsh(filepath)
     lat, lon = 30, 20
-    lunarsky.topo._spice_setup(lat, lon)
     station_name, idnum, frame_specs, latlon = lunarsky.spice_utils.topo_frame_def(
         lat, lon, moon=True
     )
-    assert lunarsky.spice_utils.check_is_loaded("*{}*".format(idnum))
+    statnum = idnum - 1301000
+    lunarsky.topo._spice_setup(lat, lon, [statnum])
+    try:
+        assert lunarsky.spice_utils.check_is_loaded("*{}*".format(idnum))
+    finally:
+        lunarsky.spice_utils.remove_topo(statnum)
