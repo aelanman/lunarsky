@@ -28,11 +28,34 @@ jobs:
         run: |
           pre-commit install
           pre-commit run -a
+  datacache:
+    name: Cache Data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: cache-kernels
+        uses: actions/cache@v2
+        with:
+          path: ~/ap_cache
+          key: "kernel_cache"
+      - name: Download and cache
+        run: |
+          pip install astropy
+          python ./ci/cache_kernels.py save
+        if: steps.cache-kernels.outputs.cache-hit != 'true'
+
   tests:
     env:
       ENV_NAME: tests
       PYTHON: ${{ matrix.python-version }}
       OS: ${{ matrix.os }}
+    needs: [datacache, linter]
     name: Testing
     runs-on: ${{ matrix.os }}
     strategy:
@@ -48,6 +71,15 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+      - name: load-cache
+        uses: actions/cache@v2
+        with:
+          path: ~/ap_cache
+          key: "kernel_cache"
+      - name: load kernels
+        run: |
+          pip install astropy
+          python ./ci/cache_kernels.py load
       - name: Install
         run: |
           pip install pytest pytest-cov

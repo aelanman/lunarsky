@@ -68,7 +68,9 @@ def test_spice_earth(grcat):
     _naif_kernel_url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels"
     kurl = [_naif_kernel_url + "/" + kname]
     kernpath = download_files_in_parallel(
-        kurl, cache=True, show_progress=False, pkgname="lunarsky"
+        kurl,
+        cache=True,
+        show_progress=False,
     )
     spice.furnsh(kernpath)
 
