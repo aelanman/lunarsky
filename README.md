@@ -2,7 +2,7 @@
 
 
 [![Build Status](https://github.com/aelanman/lunarsky/actions/workflows/testsuite.yaml/badge.svg)](https://github.com/aelanman/lunarsky/actions)
-[![codecov](https://codecov.io/gh/aelanman/lunarsky/branch/master/graph/badge.svg)](https://codecov.io/gh/aelanman/lunarsky)
+[![codecov](https://codecov.io/gh/aelanman/lunarsky/branch/main/graph/badge.svg)](https://codecov.io/gh/aelanman/lunarsky)
 
 
 An extension to `astropy`, providing selenocentric and topocentric reference frames
