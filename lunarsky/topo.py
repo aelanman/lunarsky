@@ -97,7 +97,7 @@ def _spice_setup(latitude, longitude, station_id):
 
     for lat, lon, sid in latlonids:
         sid = int(sid)  # Station IDs must be ints, but are converted to float above.
-        frameloaded = check_is_loaded(f"*LUNAR-TOPO-{sid}*")
+        frameloaded = check_is_loaded(f"FRAME_LUNAR-TOPO-{sid}")
         if not frameloaded:
             lunar_surface_ephem(
                 lat, lon, station_num=sid
