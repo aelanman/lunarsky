@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+## Fixed
+- Now tracking available lunar station_ids, instead of incrementing a counter naively.
+
 ## [0.1.2] -- 2022-01-17
 
 ## Added
