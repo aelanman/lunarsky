@@ -142,7 +142,6 @@ class MoonLocation(u.Quantity):
                     "selenocentric or selenodetic, with respective "
                     'exceptions "{}" and "{}"'.format(exc_selenocentric, exc_selenodetic)
                 )
-        self = cls._set_site_id(self)
         return self
 
     @classmethod
@@ -184,6 +183,14 @@ class MoonLocation(u.Quantity):
                 statids.append(cls._inuse_stat_ids[ind])
         inst.station_ids = statids
         return inst
+
+    def _set_station_id(self):
+        """
+        Run classmethod for setting station IDs.
+
+        Convenience function used for testing mostly
+        """
+        self.__class__._set_site_id(self)
 
     @classmethod
     def from_selenocentric(cls, x, y, z, unit=None):
@@ -237,8 +244,6 @@ class MoonLocation(u.Quantity):
         struc = np.empty(x.shape, cls._location_dtype)
         struc["x"], struc["y"], struc["z"] = x, y, z
         inst = super().__new__(cls, struc, unit, copy=False)
-
-        inst = cls._set_site_id(inst)
 
         return inst
 
@@ -305,7 +310,7 @@ class MoonLocation(u.Quantity):
         self._unit = u.meter
         inst = self.to(height.unit)
 
-        return cls._set_site_id(inst)
+        return inst
 
     def __str__(self):
         return self.__repr__()

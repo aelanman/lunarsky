@@ -30,7 +30,6 @@ def test_icrs_to_topo_long_time(time, lat, lon, grcat):
     #   ICRS -> MCMF -> TOPO
     #   ICRS -> TOPO
     loc = lunarsky.MoonLocation.from_selenodetic(lon, lat)
-    print(loc.station_ids, loc)
     topo0 = grcat.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))
     mcmf = grcat.transform_to(lunarsky.MCMF(obstime=time))
     topo1 = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=time))

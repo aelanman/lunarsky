@@ -124,6 +124,10 @@ def make_transform(coo, toframe):
         obstime = toframe.obstime
         location = toframe.location
 
+    # Initialize station_ids if not defined.
+    if location.station_ids == []:
+        location.__class__._set_site_id(location)
+
     # Make arrays
     ets = (obstime - _J2000).sec
     stat_ids = np.asarray(location.station_ids)

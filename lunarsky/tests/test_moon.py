@@ -116,6 +116,7 @@ def test_moonlocation_delete():
     locs = []
     for ii in range(5):
         locs.append(MoonLocation.from_selenodetic(lat=["-15d", "25d"], lon=["97d", "0d"]))
+        locs[-1]._set_station_id()
 
     check0 = copy.copy(MoonLocation._inuse_stat_ids)
     for ii in range(5, 0, -1):
@@ -186,6 +187,7 @@ def test_station_ids():
     for gp in lonlatheights:
         lons, lats, heights = np.array(gp).T
         locs.append(MoonLocation.from_selenodetic(lat=lats, lon=lons, height=heights))
+        locs[-1]._set_station_id()
 
     # Check that only unique positions got added
     added = len(MoonLocation._inuse_stat_ids) - len(orig_statids)
@@ -226,8 +228,10 @@ def test_statid_management(cleanup_moonlocs):
             lon=lons[ii * 500 : (ii + 1) * 500],
             lat=lats[ii * 500 : (ii + 1) * 500],
         )
+        loc._set_station_id()
         assert len(loc.station_ids) == 500
         del loc
 
+    bigloc = MoonLocation.from_selenodetic(lon=lons, lat=lats)
     with pytest.raises(ValueError, match="Too many unique MoonLocation"):
-        MoonLocation.from_selenodetic(lon=lons, lat=lats)
+        bigloc._set_station_id()
