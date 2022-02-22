@@ -107,22 +107,24 @@ def test_moonlocation_copy():
 def test_moonlocation_delete():
     # Check that making multiple instances of the same location raises the _ref_count
     # appropriately, and deleting them removes them correctly.
-    before = copy.copy(MoonLocation._existing_stat_ids)
-    s0 = MoonLocation._new_stat_id
+    before = copy.copy(MoonLocation._inuse_stat_ids)
+    if MoonLocation._avail_stat_ids is not None:
+        exp = before + MoonLocation._avail_stat_ids[-2:][::-1]
+    else:
+        exp = before + [1, 2]
 
     locs = []
     for ii in range(5):
         locs.append(MoonLocation.from_selenodetic(lat=["-15d", "25d"], lon=["97d", "0d"]))
+        locs[-1]._set_station_id()
 
-    check0 = copy.copy(MoonLocation._existing_stat_ids)
+    check0 = copy.copy(MoonLocation._inuse_stat_ids)
     for ii in range(5, 0, -1):
         assert MoonLocation._ref_count[-1] == ii
-        assert MoonLocation._existing_stat_ids[-1] == check0[-1]
+        assert MoonLocation._inuse_stat_ids[-1] == check0[-1]
         locs.pop(ii - 1)
 
-    check1 = copy.copy(MoonLocation._existing_stat_ids)
-
-    exp = before + [s0, s0 + 1]
+    check1 = copy.copy(MoonLocation._inuse_stat_ids)
 
     assert exp == check0
     assert check1 == before
@@ -132,7 +134,7 @@ def test_station_ids():
     # Check that when a MoonLocations are made, the appropriate station_ids are assigned.
 
     # Get whatever are already recorded in the class.
-    orig_statids = copy.copy(MoonLocation._existing_stat_ids)
+    orig_statids = copy.copy(MoonLocation._inuse_stat_ids)
 
     # Random positions with some repeats, in five groups
     lonlatheights = [
@@ -185,9 +187,10 @@ def test_station_ids():
     for gp in lonlatheights:
         lons, lats, heights = np.array(gp).T
         locs.append(MoonLocation.from_selenodetic(lat=lats, lon=lons, height=heights))
+        locs[-1]._set_station_id()
 
     # Check that only unique positions got added
-    added = len(MoonLocation._existing_stat_ids) - len(orig_statids)
+    added = len(MoonLocation._inuse_stat_ids) - len(orig_statids)
     assert added == n_unique
 
     statids = [loc.station_ids for loc in locs]
@@ -212,5 +215,23 @@ def test_station_ids():
     # Check that saved location strings correspond with station IDs in each instance
     for gi, gp in enumerate(statids):
         for sti, sid in enumerate(gp):
-            ind = MoonLocation._existing_stat_ids.index(sid)
+            ind = MoonLocation._inuse_stat_ids.index(sid)
             assert locstrs[gi][sti] == MoonLocation._existing_locs[ind]
+
+
+def test_statid_management(cleanup_moonlocs):
+    lats = np.random.uniform(-90, 90, 1000)
+    lons = np.random.uniform(0, 360, 1000)
+
+    for ii in range(2):
+        loc = MoonLocation.from_selenodetic(
+            lon=lons[ii * 500 : (ii + 1) * 500],
+            lat=lats[ii * 500 : (ii + 1) * 500],
+        )
+        loc._set_station_id()
+        assert len(loc.station_ids) == 500
+        del loc
+
+    bigloc = MoonLocation.from_selenodetic(lon=lons, lat=lats)
+    with pytest.raises(ValueError, match="Too many unique MoonLocation"):
+        bigloc._set_station_id()

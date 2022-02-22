@@ -15,9 +15,6 @@ from .spice_utils import remove_topo
 __all__ = ["MoonLocation", "MoonLocationAttribute"]
 
 
-_DEFAULT_SITE_ID = 98
-
-
 class MoonLocationInfo(QuantityInfoBase):
     """
     Container for meta information like name, description, format.  This is
@@ -120,10 +117,10 @@ class MoonLocation(u.Quantity):
 
     # Manage the set of defined ephemerides.
     # Class attributes only
-    _existing_stat_ids = []
+    _inuse_stat_ids = []
+    _avail_stat_ids = None
     _existing_locs = []
     _ref_count = []
-    _new_stat_id = _DEFAULT_SITE_ID  # Starting at 98
 
     # This instance's station id(s)
     station_ids = []
@@ -145,7 +142,6 @@ class MoonLocation(u.Quantity):
                     "selenocentric or selenodetic, with respective "
                     'exceptions "{}" and "{}"'.format(exc_selenocentric, exc_selenodetic)
                 )
-        self = cls._set_site_id(self)
         return self
 
     @classmethod
@@ -161,26 +157,40 @@ class MoonLocation(u.Quantity):
                     inst.height.to_value("km").item(),
                 )
             ]
+            ncrds = 1
         else:
             llh_arr = zip(inst.lon.deg, inst.lat.deg, inst.height.to_value("km"))
+            ncrds = inst.lon.size
+
         statids = []
+        if cls._avail_stat_ids is None:
+            cls._avail_stat_ids = list(range(999, 0, -1))
+
+        if len(cls._avail_stat_ids) < ncrds:
+            raise ValueError("Too many unique MoonLocation objects open at once.")
 
         for llh in llh_arr:
             lonlatheight = "_".join(["{:.4f}".format(ll) for ll in llh])
             if lonlatheight not in cls._existing_locs:
+                new_stat_id = cls._avail_stat_ids.pop()
                 cls._existing_locs.append(lonlatheight)
-                statids.append(cls._new_stat_id)
-                cls._existing_stat_ids.append(cls._new_stat_id)
-                cls._new_stat_id += 1
+                statids.append(new_stat_id)
+                cls._inuse_stat_ids.append(new_stat_id)
                 cls._ref_count.append(1)
-                if cls._new_stat_id >= 999:
-                    raise ValueError("Too many MoonLocation objects open at once. ")
             else:
                 ind = cls._existing_locs.index(lonlatheight)
                 cls._ref_count[ind] += 1
-                statids.append(cls._existing_stat_ids[ind])
+                statids.append(cls._inuse_stat_ids[ind])
         inst.station_ids = statids
         return inst
+
+    def _set_station_id(self):
+        """
+        Run classmethod for setting station IDs.
+
+        Convenience function used for testing mostly
+        """
+        self.__class__._set_site_id(self)
 
     @classmethod
     def from_selenocentric(cls, x, y, z, unit=None):
@@ -234,8 +244,6 @@ class MoonLocation(u.Quantity):
         struc = np.empty(x.shape, cls._location_dtype)
         struc["x"], struc["y"], struc["z"] = x, y, z
         inst = super().__new__(cls, struc, unit, copy=False)
-
-        inst = cls._set_site_id(inst)
 
         return inst
 
@@ -302,7 +310,7 @@ class MoonLocation(u.Quantity):
         self._unit = u.meter
         inst = self.to(height.unit)
 
-        return cls._set_site_id(inst)
+        return inst
 
     def __str__(self):
         return self.__repr__()
@@ -320,19 +328,19 @@ class MoonLocation(u.Quantity):
         return obj
 
     def __del__(self):
-        # Remove this MoonLocation's station_ids from _existing_stat_ids and
+        # Remove this MoonLocation's station_ids from _inuse_stat_ids and
         # locations from _existing_locs.
         # Also clear the corresponding frames from spice variable pool.
-
         for si, stat_id in enumerate(self.station_ids):
             try:
-                ind = self.__class__._existing_stat_ids.index(stat_id)
+                ind = self.__class__._inuse_stat_ids.index(stat_id)
             except ValueError:
                 continue
             count = self.__class__._ref_count[ind]
-            if count == 1:
-                self.__class__._existing_stat_ids.pop(ind)
+            if count <= 1:
+                sid = self.__class__._inuse_stat_ids.pop(ind)
                 self.__class__._existing_locs.pop(ind)
+                self.__class__._avail_stat_ids.insert(0, sid)
                 remove_topo(stat_id)
                 self.__class__._ref_count.pop(ind)
             else:

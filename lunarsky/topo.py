@@ -97,7 +97,7 @@ def _spice_setup(latitude, longitude, station_id):
 
     for lat, lon, sid in latlonids:
         sid = int(sid)  # Station IDs must be ints, but are converted to float above.
-        frameloaded = check_is_loaded(f"*LUNAR-TOPO-{sid}*")
+        frameloaded = check_is_loaded(f"FRAME_LUNAR-TOPO-{sid}")
         if not frameloaded:
             lunar_surface_ephem(
                 lat, lon, station_num=sid
@@ -123,6 +123,10 @@ def make_transform(coo, toframe):
         frame_spice_name, frame_id = ap_to_spice[coo.name]
         obstime = toframe.obstime
         location = toframe.location
+
+    # Initialize station_ids if not defined.
+    if location.station_ids == []:
+        location.__class__._set_site_id(location)
 
     # Make arrays
     ets = (obstime - _J2000).sec

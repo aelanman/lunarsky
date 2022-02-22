@@ -48,13 +48,14 @@ def test_icrs_to_topo_long_time(time, lat, lon, grcat):
     "time, lat, lon",
     [
         (t0, 11.2, 1.4),
-        (t0, [10.3, 11.2], [0.0, 1.4]),
+        (t0, (10.3, 11.2), (0.0, 1.4)),
         (jd_4mo[:2], 10.3, 0.0),
-        (jd_4mo[:2], [10.3, 11.2], [0.0, 1.4]),
+        (jd_4mo[:2], (10.3, 11.2), (0.0, 1.4)),
     ],
 )
 def test_transform_loops(obj, path, time, lat, lon):
     # Tests from ICRS -> path -> ICRS
+    obj = lunarsky.SkyCoord(obj)  # Ensure we're working with lunarsky-compatible SkyCoord
     loc = lunarsky.MoonLocation.from_selenodetic(lat, lon)
     fdict = {
         "lunartopo": lunarsky.LunarTopo(location=loc, obstime=time),
@@ -64,6 +65,7 @@ def test_transform_loops(obj, path, time, lat, lon):
 
     for fr in path:
         obj = obj.transform_to(fdict[fr])
+
     # Lastly, back to ICRS
     obj = obj.transform_to(ac.ICRS())
     if obj.ndim == 1:
@@ -200,7 +202,7 @@ def test_sidereal_vs_solar_day():
 )
 @pytest.mark.parametrize("toframe", ["lunartopo", "mcmf"])
 def test_nearby_obj_transforms(toframe, loc):
-    sun_gcrs = ac.get_sun(jd_4mo)
+    sun_gcrs = lunarsky.SkyCoord(ac.get_sun(jd_4mo))
 
     if toframe == "lunartopo":
         frame = lunarsky.LunarTopo(location=loc, obstime=jd_4mo)

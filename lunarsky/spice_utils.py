@@ -210,7 +210,6 @@ def remove_topo(station_num):
     # Handle a glitch in spiceypy for older versions of numpy
     if np.str_ is None:
         return
-
     for var in frame_vars:
         spice.dvpool(var)
 

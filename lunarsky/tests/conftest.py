@@ -3,6 +3,9 @@ from astropy.coordinates import SkyCoord
 import pytest
 import warnings
 
+from lunarsky.spice_utils import remove_topo
+from lunarsky.moon import MoonLocation
+
 # Ignore deprecation warnings from spiceypy
 @pytest.fixture(autouse=True)
 def ignore_representation_deprecation():
@@ -26,3 +29,17 @@ def grcat():
 
     stars = SkyCoord(ra=ras, dec=decs, unit="deg", frame="icrs")
     return stars
+
+
+@pytest.fixture
+def cleanup_moonlocs():
+    # Reset the existing set of station IDs and corresponding kernel vars.
+    yield
+
+    for sid in MoonLocation._inuse_stat_ids:
+        remove_topo(sid)
+
+    MoonLocation._inuse_stat_ids = []
+    MoonLocation._avail_stat_ids = None
+    MoonLocation._existing_locs = []
+    MoonLocation._ref_count = []

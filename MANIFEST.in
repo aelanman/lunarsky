@@ -1,0 +1,8 @@
+include *.md
+include LICENSE
+include lunarsky/*
+include setup.py
+include setup.cfg
+include docs/figure.png
+global-exclude *.py[cod]
+global-exclude __pycache__

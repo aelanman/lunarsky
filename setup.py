@@ -2,7 +2,7 @@
 # Copyright (c) 2018 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
 
-from setuptools import setup
+from setuptools import setup, find_packages
 import io
 
 
@@ -20,7 +20,7 @@ setup_args = {
     "long_description": readme,
     "long_description_content_type": "text/markdown",
     "package_dir": {"lunarsky": "lunarsky"},
-    "packages": ["lunarsky", "lunarsky.tests"],
+    "packages": find_packages(),
     "use_scm_version": {
         "root": ".",
         "relative_to": __file__,
