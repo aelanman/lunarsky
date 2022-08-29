@@ -264,3 +264,23 @@ def test_incompatible_transform(fromframe):
     src = lunarsky.SkyCoord(coo)
     with pytest.raises(IncompatibleShapeError):
         src.transform_to(ltop)
+
+
+def test_finite_vs_spherical():
+    # Transform MCMF coordinates with distance and without
+    # Assumes infinite distance if no unit given, as astropy does.
+    R0 = 2e3
+    N = 100
+    phi = np.linspace(0, 2 * np.pi, N)
+    xyz = R0 * un.km * np.array([np.cos(phi), np.sin(phi), np.zeros(N)])
+    with_units = lunarsky.SkyCoord(lunarsky.MCMF(*xyz))
+    xyz = R0 * np.array([np.cos(phi), np.sin(phi), np.zeros(N)])
+    sans_units = lunarsky.SkyCoord(lunarsky.MCMF(*xyz))
+
+    loc = lunarsky.MoonLocation.from_selenodetic(lon=180 * un.deg, lat=0, height=0)
+    altaz_with_units = with_units.transform_to(lunarsky.LunarTopo(location=loc))
+    altaz_sans_units = sans_units.transform_to(lunarsky.LunarTopo(location=loc))
+
+    radius = lunarsky.spice_utils.LUNAR_RADIUS * un.m
+    assert np.all(altaz_with_units.distance < radius + R0 * un.km)
+    assert_quantity_allclose(altaz_sans_units.distance, 1.0)

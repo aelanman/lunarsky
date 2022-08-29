@@ -3,6 +3,9 @@
 ## Unreleased
 
 ## Fixed
+- Accept tuple for location in Time class (in this case, assumes EarthLocation)
+- Use newer PCK file in unit test with Earth positioning.
+- Match behavior of astropy when transforming non-unit cartesian positions without units (treat as unitspherical using direction info only)
 - Now tracking available lunar station_ids, instead of incrementing a counter naively.
 
 ## [0.1.2] -- 2022-01-17

@@ -33,7 +33,7 @@ class Time(astropy.time.Time):
     ):
 
         super_loc = None
-        if isinstance(location, EarthLocation):
+        if isinstance(location, (EarthLocation, tuple)):
             super_loc = location
 
         super().__init__(
