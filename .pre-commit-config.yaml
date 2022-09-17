@@ -1,4 +1,4 @@
-exclude: '(^lunarsky/data/*)'
+exclude: '(^lunarsky/data/)'
 
 repos:
     - repo: git://github.com/pre-commit/pre-commit-hooks
