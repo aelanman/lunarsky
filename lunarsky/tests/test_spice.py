@@ -64,8 +64,7 @@ def test_spice_earth(grcat):
     )
 
     # One more kernel is needed for the ITRF93 frame.
-    # kname = "pck/earth_latest_high_prec.bpc"
-    kname = "pck/earth_000101_221031_220807.bpc"
+    kname = "pck/earth_latest_high_prec.bpc"
     _naif_kernel_url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels"
     kurl = [_naif_kernel_url + "/" + kname]
     kernpath = download_files_in_parallel(
