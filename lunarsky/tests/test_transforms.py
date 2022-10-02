@@ -3,7 +3,7 @@ from copy import deepcopy
 from lunarsky.time import Time, TimeDelta
 import astropy.coordinates as ac
 from astropy import units as un
-from astropy.utils import IncompatibleShapeError
+from astropy.utils import IncompatibleShapeError, exceptions
 from astropy.tests.helper import assert_quantity_allclose
 import lunarsky
 import pytest
@@ -279,7 +279,8 @@ def test_finite_vs_spherical():
 
     loc = lunarsky.MoonLocation.from_selenodetic(lon=180 * un.deg, lat=0, height=0)
     altaz_with_units = with_units.transform_to(lunarsky.LunarTopo(location=loc))
-    altaz_sans_units = sans_units.transform_to(lunarsky.LunarTopo(location=loc))
+    with pytest.warns(exceptions.AstropyUserWarning, match="Coordinate vectors do not "):
+        altaz_sans_units = sans_units.transform_to(lunarsky.LunarTopo(location=loc))
 
     radius = lunarsky.spice_utils.LUNAR_RADIUS * un.m
     assert np.all(altaz_with_units.distance < radius + R0 * un.km)

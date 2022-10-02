@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 from astropy.utils.decorators import format_doc
 from astropy.coordinates.representation import (
     SphericalRepresentation,
@@ -6,7 +7,7 @@ from astropy.coordinates.representation import (
     UnitSphericalRepresentation,
     CartesianRepresentation,
 )
-from astropy.utils import check_broadcast
+from astropy.utils import check_broadcast, exceptions
 from astropy.coordinates.baseframe import (
     BaseCoordinateFrame,
     base_doc,
@@ -185,6 +186,12 @@ def make_transform(coo, toframe):
     newrepr = coo_cart.transform(mats).reshape(shape_out)
 
     if is_unitspherical:
+        if np.any(newrepr.norm() > 1.0):
+            warnings.warn(
+                "Coordinates do not all have unit magnitude, but will be treated as unit spherical,"
+                "Define coordinates as Quantity or normalize to remove this warning.",
+                exceptions.AstropyUserWarning,
+            )
         newrepr = newrepr.represent_as(UnitSphericalRepresentation)
 
     return toframe.realize_frame(newrepr)
