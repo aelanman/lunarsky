@@ -279,7 +279,7 @@ def test_finite_vs_spherical():
 
     loc = lunarsky.MoonLocation.from_selenodetic(lon=180 * un.deg, lat=0, height=0)
     altaz_with_units = with_units.transform_to(lunarsky.LunarTopo(location=loc))
-    with pytest.warns(exceptions.AstropyUserWarning, match="Coordinate vectors do not "):
+    with pytest.warns(exceptions.AstropyUserWarning, match="Coordinates do not "):
         altaz_sans_units = sans_units.transform_to(lunarsky.LunarTopo(location=loc))
 
     radius = lunarsky.spice_utils.LUNAR_RADIUS * un.m
