@@ -186,7 +186,7 @@ def make_transform(coo, toframe):
     newrepr = coo_cart.transform(mats).reshape(shape_out)
 
     if is_unitspherical:
-        if np.any(newrepr.norm() > 1.0):
+        if not np.allclose(newrepr.norm(), 1.0):
             warnings.warn(
                 "Coordinates do not all have unit magnitude, but will be treated as unit spherical,"
                 "Define coordinates as Quantity or normalize to remove this warning.",

@@ -25,6 +25,7 @@ jd_4mo = t0 + TimeDelta(np.linspace(0, 4 * 28 * 24 * 3600.0, 100), format="sec")
 
 @pytest.mark.parametrize("time", jd_10yr)
 @pytest.mark.parametrize("lat,lon", latlons_grid)
+@pytest.mark.filterwarnings("ignore::erfa.ErfaWarning")
 def test_icrs_to_topo_long_time(time, lat, lon, grcat):
     # Check that the following transformation paths are equivalent:
     #   ICRS -> MCMF -> TOPO
@@ -48,9 +49,9 @@ def test_icrs_to_topo_long_time(time, lat, lon, grcat):
     "time, lat, lon",
     [
         (t0, 11.2, 1.4),
-        (t0, (10.3, 11.2), (0.0, 1.4)),
+        (t0, [10.3, 11.2], [0.0, 1.4]),
         (jd_4mo[:2], 10.3, 0.0),
-        (jd_4mo[:2], (10.3, 11.2), (0.0, 1.4)),
+        (jd_4mo[:2], [10.3, 11.2], [0.0, 1.4]),
     ],
 )
 def test_transform_loops(obj, path, time, lat, lon):
@@ -84,6 +85,7 @@ def test_topo_to_topo():
     assert new.az.deg == 90
 
 
+@pytest.mark.filterwarnings("ignore::erfa.ErfaWarning")
 def test_mcmf_to_mcmf():
     # Transform MCMF positions to MCMF frame half a lunar sidereal day later.
     # Assert that the new positions are roughly close to 180 deg from the original.

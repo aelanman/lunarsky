@@ -282,7 +282,7 @@ class MoonLocation(u.Quantity):
         the mean position of the "sub-Earth" point on the lunar surface.
 
         """
-        lon = Longitude(lon, u.degree, wrap_angle=180 * u.degree, copy=False)
+        lon = Longitude(lon, u.degree, copy=False).wrap_at(180 * u.degree)
         lat = Latitude(lat, u.degree, copy=False)
         # don't convert to m by default, so we can use the height unit below.
         if not isinstance(height, u.Quantity):
