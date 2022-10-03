@@ -1,5 +1,5 @@
 import numpy as np
-from astropy.coordinates import ICRS
+from astropy.coordinates import ICRS, EarthLocation
 from astropy.time import TimeDelta
 import pytest
 
@@ -23,3 +23,15 @@ def test_sidereal_time_calculation(lat, lon):
         src = SkyCoord(alt="90d", az="0d", frame="lunartopo", obstime=tt, location=loc)
         lst = tt.sidereal_time("mean")
         assert np.isclose(lst.deg, src.transform_to(ICRS()).ra.deg, atol=1e-4)
+
+
+def test_earthloc():
+    lat = -30.0
+    lon = 127.0
+
+    t0 = Time(
+        "2020-01-01T00:00:00", location=EarthLocation.from_geodetic(lon=lon, lat=lat)
+    )
+    t1 = Time("2020-01-01T00:00:00", location=(lon, lat))
+
+    assert t0.location == t1.location
