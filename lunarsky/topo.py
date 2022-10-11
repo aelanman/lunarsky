@@ -125,6 +125,9 @@ def make_transform(coo, toframe):
         obstime = toframe.obstime
         location = toframe.location
 
+    if location is None:
+        raise ValueError("location must be defined for LunarTopo transformations")
+
     # Initialize station_ids if not defined.
     if location.station_ids == []:
         location.__class__._set_site_id(location)

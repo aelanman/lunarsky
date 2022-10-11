@@ -53,7 +53,7 @@ class Time(astropy.time.Time):
 
     def sidereal_time(self, kind, longitude=None, model=None):
         # Currently returns the zenith RA as the LST.
-        if self.location is None or self.location is EarthLocation:
+        if self.location is None or isinstance(self.location, EarthLocation):
             return super().sidereal_time(kind, longitude=longitude, model=model)
 
         if model is not None:
