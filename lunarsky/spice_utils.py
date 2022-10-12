@@ -12,8 +12,12 @@ from .mcmf import MCMF
 from .data import DATA_PATH
 
 _J2000 = Time("J2000")
+LUNAR_RADIUS = 1737.1e3  # m
 
 TEMPORARY_KERNEL_DIR = tempfile.TemporaryDirectory()
+
+# TODO --> Look for updated kernels and coordinate definitions.
+#          Use https://naif.jpl.nasa.gov/pub/naif/MER/misc/pck/pck00008.tpc for lunar radii
 
 
 def check_is_loaded(search):
@@ -53,7 +57,6 @@ def furnish_kernels():
         "fk/satellites/moon_080317.tf",
         "fk/satellites/moon_assoc_me.tf",
     ]
-
     kernel_paths = [os.path.join(DATA_PATH, kn) for kn in kernel_names]
     for kp in kernel_paths:
         spice.furnsh(kp)
@@ -94,9 +97,10 @@ def lunar_surface_ephem(latitude, longitude, station_num=98):
 
     lat = np.radians(latitude)
     lon = np.radians(longitude)
-    lunar_radius = 1737.1  # km
     ets = np.array([spice.str2et("1950-01-01"), spice.str2et("2150-01-01")])
-    pos_mcmf = spice.latrec(lunar_radius, lon, lat)  # TODO Use MoonLocation instead?
+    pos_mcmf = spice.latrec(
+        LUNAR_RADIUS / 1e3, lon, lat
+    )  # TODO Use MoonLocation instead?
 
     states = np.zeros((len(ets), 6))
     states[:, :3] = np.repeat(pos_mcmf[None, :], len(ets), axis=0)
@@ -207,7 +211,7 @@ def remove_topo(station_num):
 
     frame_vars = [s.format(idnum, station_name, fm_center_id) for s in fmt_vars]
 
-    # Handle a glitch in spiceypy for older versions of numpy
+    # Handle a bug in spiceypy for older versions of numpy
     if np.str_ is None:
         return
     for var in frame_vars:

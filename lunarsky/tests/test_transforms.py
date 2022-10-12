@@ -3,7 +3,7 @@ from copy import deepcopy
 from lunarsky.time import Time, TimeDelta
 import astropy.coordinates as ac
 from astropy import units as un
-from astropy.utils import IncompatibleShapeError
+from astropy.utils import IncompatibleShapeError, exceptions
 from astropy.tests.helper import assert_quantity_allclose
 import lunarsky
 import pytest
@@ -25,6 +25,7 @@ jd_4mo = t0 + TimeDelta(np.linspace(0, 4 * 28 * 24 * 3600.0, 100), format="sec")
 
 @pytest.mark.parametrize("time", jd_10yr)
 @pytest.mark.parametrize("lat,lon", latlons_grid)
+@pytest.mark.filterwarnings("ignore::erfa.ErfaWarning")
 def test_icrs_to_topo_long_time(time, lat, lon, grcat):
     # Check that the following transformation paths are equivalent:
     #   ICRS -> MCMF -> TOPO
@@ -48,9 +49,9 @@ def test_icrs_to_topo_long_time(time, lat, lon, grcat):
     "time, lat, lon",
     [
         (t0, 11.2, 1.4),
-        (t0, (10.3, 11.2), (0.0, 1.4)),
+        (t0, [10.3, 11.2], [0.0, 1.4]),
         (jd_4mo[:2], 10.3, 0.0),
-        (jd_4mo[:2], (10.3, 11.2), (0.0, 1.4)),
+        (jd_4mo[:2], [10.3, 11.2], [0.0, 1.4]),
     ],
 )
 def test_transform_loops(obj, path, time, lat, lon):
@@ -84,6 +85,7 @@ def test_topo_to_topo():
     assert new.az.deg == 90
 
 
+@pytest.mark.filterwarnings("ignore::erfa.ErfaWarning")
 def test_mcmf_to_mcmf():
     # Transform MCMF positions to MCMF frame half a lunar sidereal day later.
     # Assert that the new positions are roughly close to 180 deg from the original.
@@ -264,3 +266,24 @@ def test_incompatible_transform(fromframe):
     src = lunarsky.SkyCoord(coo)
     with pytest.raises(IncompatibleShapeError):
         src.transform_to(ltop)
+
+
+def test_finite_vs_spherical():
+    # Transform MCMF coordinates with distance and without
+    # Assumes infinite distance if no unit given, as astropy does.
+    R0 = 2e3
+    N = 100
+    phi = np.linspace(0, 2 * np.pi, N)
+    xyz = R0 * un.km * np.array([np.cos(phi), np.sin(phi), np.zeros(N)])
+    with_units = lunarsky.SkyCoord(lunarsky.MCMF(*xyz))
+    xyz = R0 * np.array([np.cos(phi), np.sin(phi), np.zeros(N)])
+    sans_units = lunarsky.SkyCoord(lunarsky.MCMF(*xyz))
+
+    loc = lunarsky.MoonLocation.from_selenodetic(lon=180 * un.deg, lat=0, height=0)
+    altaz_with_units = with_units.transform_to(lunarsky.LunarTopo(location=loc))
+    with pytest.warns(exceptions.AstropyUserWarning, match="Coordinates do not "):
+        altaz_sans_units = sans_units.transform_to(lunarsky.LunarTopo(location=loc))
+
+    radius = lunarsky.spice_utils.LUNAR_RADIUS * un.m
+    assert np.all(altaz_with_units.distance < radius + R0 * un.km)
+    assert_quantity_allclose(altaz_sans_units.distance, 1.0)

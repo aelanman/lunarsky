@@ -10,7 +10,7 @@ from astropy.coordinates.representation import (
 )
 from astropy.coordinates.attributes import Attribute
 
-from .spice_utils import remove_topo
+from .spice_utils import remove_topo, LUNAR_RADIUS
 
 __all__ = ["MoonLocation", "MoonLocationAttribute"]
 
@@ -113,7 +113,7 @@ class MoonLocation(u.Quantity):
     _location_dtype = np.dtype({"names": ["x", "y", "z"], "formats": [np.float64] * 3})
     _array_dtype = np.dtype((np.float64, (3,)))
 
-    _lunar_radius = 1737.1e3  # m
+    _lunar_radius = LUNAR_RADIUS
 
     # Manage the set of defined ephemerides.
     # Class attributes only
@@ -282,7 +282,7 @@ class MoonLocation(u.Quantity):
         the mean position of the "sub-Earth" point on the lunar surface.
 
         """
-        lon = Longitude(lon, u.degree, wrap_angle=180 * u.degree, copy=False)
+        lon = Longitude(lon, u.degree, copy=False).wrap_at(180 * u.degree)
         lat = Latitude(lat, u.degree, copy=False)
         # don't convert to m by default, so we can use the height unit below.
         if not isinstance(height, u.Quantity):

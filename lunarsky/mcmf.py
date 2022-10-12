@@ -94,6 +94,9 @@ def make_transform(coo, toframe):
 
     newrepr = coo_cart.transform(mats).reshape(shape_out)
 
+    if is_unitspherical:
+        newrepr = newrepr.represent_as(UnitSphericalRepresentation)
+
     return toframe.realize_frame(newrepr)
 
 
