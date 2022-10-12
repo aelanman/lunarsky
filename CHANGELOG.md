@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.2.0] -- 2022-10-12
 
 ## Fixed
 - Updated version of pre-commit-hooks used
