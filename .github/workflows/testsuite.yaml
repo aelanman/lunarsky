@@ -2,6 +2,7 @@ name: Tests
 
 on:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   linter:
@@ -11,11 +12,11 @@ jobs:
       ENV_NAME: linting
       PYTHON: 3.8
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
          fetch-depth: 1
       - name: Set up Python 3.8
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.8
       - name: Setup Environment
@@ -29,11 +30,11 @@ jobs:
     name: Cache Data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 1
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.8
       - name: Get current date
@@ -64,11 +65,11 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         python-version: [3.7, 3.8, 3.9]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 1
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
       - name: Get current date
