@@ -105,7 +105,7 @@ class SkyCoord(aSkyCoord):
 
         # Finally make the new SkyCoord object from the `new_coord` and
         # remaining frame_kwargs that are not frame_attributes in `new_coord`.
-        for attr in set(new_coord.get_frame_attr_names()) & set(frame_kwargs.keys()):
+        for attr in set(new_coord.frame_attributes.keys()) & set(frame_kwargs.keys()):
             frame_kwargs.pop(attr)
 
         return self.__class__(new_coord, **frame_kwargs)

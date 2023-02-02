@@ -9,7 +9,7 @@ from lunarsky import MoonLocation, MoonLocationAttribute, MCMF
 class TestsWithObject:
     # The following three functions have been adapted from corresponding
     # tests in astropy/coordinates/tests/test_earth.py
-    def setup(self):
+    def setup_method(self):
         # Check that the setup from different input formats works as expected.
         self.lon = Longitude(
             [0.0, 45.0, 90.0, 135.0, 180.0, -180, -90, -45],
@@ -78,7 +78,7 @@ def test_moonlocation_attribute():
     # Confirm each looks like a typical MoonLocation
 
     testObj = TestsWithObject()
-    testObj.setup()
+    testObj.setup_method()
     moonloc = testObj.location
 
     mlattr = MoonLocationAttribute()
