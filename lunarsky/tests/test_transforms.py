@@ -8,6 +8,11 @@ from astropy.tests.helper import assert_quantity_allclose
 import lunarsky
 import pytest
 
+try:
+    from astropy.coordinates.angles.utils import angular_separation
+except ImportError:
+    from astropy.coordinates.angle_utilities import angular_separation
+
 # Lunar station positions
 Nangs = 3
 latitudes = np.linspace(-90, 90, Nangs)
@@ -97,7 +102,7 @@ def test_mcmf_to_mcmf():
     )
     sph0 = src.spherical
     sph1 = orig_pos.spherical
-    res = ac.angle_utilities.angular_separation(
+    res = angular_separation(
         sph0.lon, sph0.lat, sph1.lon, sph1.lat
     ).to("deg")
     assert_quantity_allclose(res, 177 * un.deg, atol=5 * un.deg)
@@ -238,7 +243,7 @@ def test_incompatible_shape_error(Nt, Nl, success):
     if success:
         lunarsky.LunarTopo(location=locs, obstime=times)
     else:
-        with pytest.raises(ValueError, match="non-scalar attributes"):
+        with pytest.raises(ValueError, match="non-scalar data and/or attributes"):
             lunarsky.LunarTopo(location=locs, obstime=times)
 
 

@@ -4,6 +4,7 @@ from astropy import units as u
 from astropy.units.quantity import QuantityInfoBase
 from astropy.coordinates.angles import Longitude, Latitude
 from astropy.coordinates.earth import GeodeticLocation
+from astropy.coordinates.representation.geodetic import BaseGeodeticRepresentation
 from astropy.coordinates.representation import (
     CartesianRepresentation,
     SphericalRepresentation,
@@ -14,6 +15,53 @@ from .spice_utils import remove_topo, LUNAR_RADIUS
 
 __all__ = ["MoonLocation", "MoonLocationAttribute"]
 
+class SPHERESelenodeticRepresentation(BaseGeodeticRepresentation):
+    """Lunar ellipsoid as a sphere
+
+        Radius defined by lunarsky.spice_utils.LUNAR_RADIUS
+    """
+    _equatorial_radius = LUNAR_RADIUS * u.m 
+    _flattening = 0.0
+
+class GRAIL23SelenodeticRepresentation(BaseGeodeticRepresentation):
+    """Lunar ellipsoid defined by gravimetry of GRAIL data.
+
+    https://doi.org/10.1007/s40328-023-00415-w
+    """
+    _equatorial_radius = 1737576.6 * u.m
+    _flattening = 0.000305
+
+class CE1LAM10SelenodeticRepresentation(BaseGeodeticRepresentation):
+    """Lunar ellipsoid from Chang'e 1 laser altimetry.
+
+    Rotation ellipsoid = CE-1-LAM-GEO
+
+    https://doi.org/10.1007/s11430-010-4060-6
+    """
+    _equatorial_radius = 1737.632 * u.km
+    _flattening = 1/973.463
+
+
+# Define reference ellipsoids
+LUNAR_ELLIPSOIDS = {
+    "SPHERE" : SPHERESelenodeticRepresentation,
+    "GRAIL23" : GRAIL23SelenodeticRepresentation,
+    "CE-1-LAM-GEO" : CE1LAM10SelenodeticRepresentation,
+}
+
+
+class SelenodeticLocation(GeodeticLocation):
+    """Rename GeodeticLocation class for clarity"""
+
+
+def _check_ellipsoid(ellipsoid=None, default="SPHERE"):
+    """Defaulting lunar ellipsoid"""
+    if ellipsoid is None:
+        ellipsoid = default
+    if ellipsoid not in LUNAR_ELLIPSOIDS:
+        raise ValueError(f"Ellipsoid {ellipsoid} not among known ones ({ELLIPSOIDS})")
+    return ellipsoid
+
 
 class MoonLocationInfo(QuantityInfoBase):
     """
@@ -22,10 +70,12 @@ class MoonLocationInfo(QuantityInfoBase):
     be used as a general way to store meta information.
     """
 
-    _represent_as_dict_attrs = ("x", "y", "z")
+    _represent_as_dict_attrs = ("x", "y", "z", "ellipsoid")
 
     def _construct_from_dict(self, map):
+        ellipsoid = map.pop("ellipsoid")
         out = self._parent_cls(**map)
+        out.ellipsoid = ellipsoid
         return out
 
     def new_like(self, cols, length, metadata_conflicts="warn", name=None):
@@ -53,7 +103,7 @@ class MoonLocationInfo(QuantityInfoBase):
             Empty instance of this class consistent with ``cols``
         """
         # Very similar to QuantityInfo.new_like, but the creation of the
-        # map is different enough that this needs its own rouinte.
+        # map is different enough that this needs its own routine.
         # Get merged info attributes shape, dtype, format, description.
         attrs = self.merge_cols_attributes(
             cols, metadata_conflicts, name, ("meta", "format", "description")
@@ -110,6 +160,7 @@ class MoonLocation(u.Quantity):
     property.
     """
 
+    _ellipsoid = "SPHERE"
     _location_dtype = np.dtype({"names": ["x", "y", "z"], "formats": [np.float64] * 3})
     _array_dtype = np.dtype((np.float64, (3,)))
 
@@ -248,7 +299,7 @@ class MoonLocation(u.Quantity):
         return inst
 
     @classmethod
-    def from_selenodetic(cls, lon, lat, height=0.0):
+    def from_selenodetic(cls, lon, lat, height=0.0, ellipsoid=None):
         """
         Location on the Moon, from latitude and longitude.
 
@@ -264,6 +315,10 @@ class MoonLocation(u.Quantity):
             Height above reference sphere (if float, in meters; default: 0).
             The reference sphere is a sphere of radius 1737.1 kilometers,
             from the center of mass of the Moon.
+        ellipsoid : str, optional
+            Name of the reference ellipsoid to use (default: 'SPHERE').
+            Available ellipsoids are:  'SPHERE', 'GRAIL23', 'CE-1-LAM-GEO'.
+            See docstrings for classes in ELLIPSOIDS dictionary for references.
 
         Raises
         ------
@@ -281,7 +336,11 @@ class MoonLocation(u.Quantity):
         relative to a prime meridian, which is itself given by
         the mean position of the "sub-Earth" point on the lunar surface.
 
+        For the conversion to selenocentric coordinates, the ERFA routine
+        ``gd2gce`` is used.  See https://github.com/liberfa/erfa
+
         """
+        ellipsoid = _check_ellipsoid(ellipsoid, default=cls._ellipsoid)
         lon = Longitude(lon, u.degree, copy=False).wrap_at(180 * u.degree)
         lat = Latitude(lat, u.degree, copy=False)
         # don't convert to m by default, so we can use the height unit below.
@@ -351,11 +410,10 @@ class MoonLocation(u.Quantity):
         """Convert to selenodetic coordinates."""
         return self.to_selenodetic()
 
-    def to_selenodetic(self):
+    def to_selenodetic(self, ellipsoid=None):
         """Convert to selenodetic coordinates (lat, lon, height).
 
-        Height is in reference to a sphere with radius `_lunar_radius`,
-        centered at the center of mass.
+        Height is in reference to the ellipsoid.
 
         Returns
         -------
@@ -364,15 +422,16 @@ class MoonLocation(u.Quantity):
             `~astropy.coordinates.Latitude`, and `~astropy.units.Quantity`
 
         """
+        ellipsoid = _check_ellipsoid(ellipsoid)
         xyz = self.view(self._array_dtype, u.Quantity)
-        lld = CartesianRepresentation(xyz, xyz_axis=-1, copy=False).represent_as(
-            SphericalRepresentation
+        llh = CartesianRepresentation(xyz, xyz_axis=-1, copy=False).represent_as(
+            LUNAR_ELLIPSOIDS[ellipsoid],
         )
-        return GeodeticLocation(
-            Longitude(lld.lon, u.degree, wrap_angle=180.0 * u.degree, copy=False),
-            Latitude(lld.lat, u.degree, copy=False),
+        return SelenodeticLocation(
+            Longitude(llh.lon, u.degree, wrap_angle=180.0 * u.degree, copy=False),
+            Latitude(llh.lat, u.degree, copy=False),
             u.Quantity(
-                lld.distance - (self._lunar_radius * u.meter), self.unit, copy=False
+                llh.height, self.unit, copy=False
             ),
         )
 
