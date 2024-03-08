@@ -23,6 +23,14 @@ class SPHERESelenodeticRepresentation(BaseGeodeticRepresentation):
     _equatorial_radius = LUNAR_RADIUS * u.m 
     _flattening = 0.0
 
+class GSFCSelenodeticRepresentation(BaseGeodeticRepresentation):
+    """Lunar ellipsoid from NASA/GSFC "Planetary Fact Sheet"
+
+       https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
+    """
+    _equatorial_radius = 1738.1 * u.m
+    _flattening = 0.0012
+
 class GRAIL23SelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid defined by gravimetry of GRAIL data.
 
@@ -45,6 +53,7 @@ class CE1LAM10SelenodeticRepresentation(BaseGeodeticRepresentation):
 # Define reference ellipsoids
 LUNAR_ELLIPSOIDS = {
     "SPHERE" : SPHERESelenodeticRepresentation,
+    "GSFC" : GSFCSelenodeticRepresentation,
     "GRAIL23" : GRAIL23SelenodeticRepresentation,
     "CE-1-LAM-GEO" : CE1LAM10SelenodeticRepresentation,
 }
