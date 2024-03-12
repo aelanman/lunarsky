@@ -12,13 +12,8 @@ from .mcmf import MCMF
 from .data import DATA_PATH
 
 _J2000 = Time("J2000")
-LUNAR_RADIUS = 1737.1e3  # m
 
 TEMPORARY_KERNEL_DIR = tempfile.TemporaryDirectory()
-
-# TODO --> Look for updated kernels and coordinate definitions.
-#          Use https://naif.jpl.nasa.gov/pub/naif/MER/misc/pck/pck00008.tpc for lunar radii
-
 
 def check_is_loaded(search):
     """
@@ -73,7 +68,7 @@ def furnish_kernels():
     return kernel_paths
 
 
-def lunar_surface_ephem(latitude, longitude, station_num=98):
+def lunar_surface_ephem(pos_x, pos_y, pos_z, station_num=98):
     """
     Make an SPK for the point on the lunar surface
 
@@ -81,10 +76,8 @@ def lunar_surface_ephem(latitude, longitude, station_num=98):
 
     Parameters
     ----------
-    latitude: float
-        Mean-Earth frame selenodetic latitude in degrees.
-    longitude: float
-        Mean-Earth frame selenodetic longitude in degrees.
+    pos_x, pos_y, pos_z: float
+        MCMF frame cartesian position in km
     station_num: int
         Station number
 
@@ -95,15 +88,10 @@ def lunar_surface_ephem(latitude, longitude, station_num=98):
     """
     point_id = 301000 + station_num
 
-    lat = np.radians(latitude)
-    lon = np.radians(longitude)
     ets = np.array([spice.str2et("1950-01-01"), spice.str2et("2150-01-01")])
-    pos_mcmf = spice.latrec(
-        LUNAR_RADIUS / 1e3, lon, lat
-    )  # TODO Use MoonLocation instead?
 
     states = np.zeros((len(ets), 6))
-    states[:, :3] = np.repeat(pos_mcmf[None, :], len(ets), axis=0)
+    states[:, :3] = np.repeat([[pos_x], [pos_y], [pos_z]], len(ets), axis=1).T
 
     center = 301
     frame = "MOON_ME"

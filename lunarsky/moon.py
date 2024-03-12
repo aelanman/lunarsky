@@ -11,7 +11,9 @@ from astropy.coordinates.representation import (
 )
 from astropy.coordinates.attributes import Attribute
 
-from .spice_utils import remove_topo, LUNAR_RADIUS
+from .spice_utils import remove_topo
+
+LUNAR_RADIUS = 1737.1e3  # m
 
 __all__ = ["MoonLocation", "MoonLocationAttribute"]
 
@@ -28,7 +30,7 @@ class GSFCSelenodeticRepresentation(BaseGeodeticRepresentation):
 
        https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
     """
-    _equatorial_radius = 1738.1 * u.m
+    _equatorial_radius = 1738.1e3 * u.m
     _flattening = 0.0012
 
 class GRAIL23SelenodeticRepresentation(BaseGeodeticRepresentation):
@@ -51,7 +53,7 @@ class CE1LAM10SelenodeticRepresentation(BaseGeodeticRepresentation):
 
 
 # Define reference ellipsoids
-LUNAR_ELLIPSOIDS = {
+SELENOIDS = {
     "SPHERE" : SPHERESelenodeticRepresentation,
     "GSFC" : GSFCSelenodeticRepresentation,
     "GRAIL23" : GRAIL23SelenodeticRepresentation,
@@ -67,9 +69,19 @@ def _check_ellipsoid(ellipsoid=None, default="SPHERE"):
     """Defaulting lunar ellipsoid"""
     if ellipsoid is None:
         ellipsoid = default
-    if ellipsoid not in LUNAR_ELLIPSOIDS:
-        raise ValueError(f"Ellipsoid {ellipsoid} not among known ones ({ELLIPSOIDS})")
+    if ellipsoid not in SELENOIDS:
+        raise ValueError(f"Ellipsoid {ellipsoid} not among known ones ({SELENOIDS})")
     return ellipsoid
+
+
+def _add_rm_ellipsoid(ellipsoid, name, add=True):
+    """Add or remove an ellipsoid class from SELENOIDS.
+    Needed for testing."""
+    global SELENOIDS
+    if add:
+        SELENOIDS[name] = ellipsoid
+    else:
+        SELENOIDS.pop(name, None)
 
 
 class MoonLocationInfo(QuantityInfoBase):
@@ -152,8 +164,10 @@ class MoonLocation(u.Quantity):
     This class uses the ME frame.
 
     Positions may be defined in Cartesian (x, y, z) coordinates with respect to the
-    center of mass of the Moon, or in ``selenodetic'' coordinates (longitude, latitude).
-    In selenodetic coordinates, positions are on the surface exactly.
+    center of mass of the Moon, or in ``selenodetic'' coordinates (longitude, latitude, height).
+
+    Selenodetic coordinates are defined with respect to a reference ellipsoid. The default is a
+    sphere of radius 1731.1e3 km, but other ellipsoids are available. See lunarsky.moon.SELENOIDS.
 
     See:
         "A Standardized Lunar Coordinate System for the Lunar Reconnaissance
@@ -172,8 +186,6 @@ class MoonLocation(u.Quantity):
     _ellipsoid = "SPHERE"
     _location_dtype = np.dtype({"names": ["x", "y", "z"], "formats": [np.float64] * 3})
     _array_dtype = np.dtype((np.float64, (3,)))
-
-    _lunar_radius = LUNAR_RADIUS
 
     # Manage the set of defined ephemerides.
     # Class attributes only
@@ -230,7 +242,7 @@ class MoonLocation(u.Quantity):
             raise ValueError("Too many unique MoonLocation objects open at once.")
 
         for llh in llh_arr:
-            lonlatheight = "_".join(["{:.4f}".format(ll) for ll in llh])
+            lonlatheight = "_".join(["{:.4f}".format(ll) for ll in llh] + [inst._ellipsoid])
             if lonlatheight not in cls._existing_locs:
                 new_stat_id = cls._avail_stat_ids.pop()
                 cls._existing_locs.append(lonlatheight)
@@ -362,23 +374,14 @@ class MoonLocation(u.Quantity):
                     str(lon.shape), str(lat.shape)
                 )
             )
+
         # get selenocentric coordinates. Have to give one-dimensional array.
 
-        lunar_radius = u.Quantity(cls._lunar_radius, u.m, copy=False)
-
-        Npts = lon.size
-        xyz = np.zeros((Npts, 3))
-        xyz[:, 0] = (lunar_radius + height) * np.cos(lat) * np.cos(lon)
-        xyz[:, 1] = (lunar_radius + height) * np.cos(lat) * np.sin(lon)
-        xyz[:, 2] = (lunar_radius + height) * np.sin(lat)
-
-        xyz = np.squeeze(xyz)
-
-        self = xyz.ravel().view(cls._location_dtype, cls).reshape(xyz.shape[:-1])
-        self._unit = u.meter
-        inst = self.to(height.unit)
-
-        return inst
+        selenodetic = SELENOIDS[ellipsoid](lon, lat, height, copy=False)
+        xyz = selenodetic.to_cartesian().get_xyz(xyz_axis=-1) << height.unit
+        self = xyz.view(cls._location_dtype, cls).reshape(selenodetic.shape)
+        self._ellipsoid = ellipsoid
+        return self
 
     def __str__(self):
         return self.__repr__()
@@ -419,6 +422,15 @@ class MoonLocation(u.Quantity):
         """Convert to selenodetic coordinates."""
         return self.to_selenodetic()
 
+    @property
+    def ellipsoid(self):
+        """The default ellipsoid used to convert to selenodetic coordinates."""
+        return self._ellipsoid
+
+    @ellipsoid.setter
+    def ellipsoid(self, ellipsoid):
+        self._ellipsoid = _check_ellipsoid(ellipsoid)
+
     def to_selenodetic(self, ellipsoid=None):
         """Convert to selenodetic coordinates (lat, lon, height).
 
@@ -431,10 +443,10 @@ class MoonLocation(u.Quantity):
             `~astropy.coordinates.Latitude`, and `~astropy.units.Quantity`
 
         """
-        ellipsoid = _check_ellipsoid(ellipsoid)
+        ellipsoid = _check_ellipsoid(ellipsoid, default=self.ellipsoid)
         xyz = self.view(self._array_dtype, u.Quantity)
         llh = CartesianRepresentation(xyz, xyz_axis=-1, copy=False).represent_as(
-            LUNAR_ELLIPSOIDS[ellipsoid],
+            SELENOIDS[ellipsoid],
         )
         return SelenodeticLocation(
             Longitude(llh.lon, u.degree, wrap_angle=180.0 * u.degree, copy=False),
@@ -544,6 +556,8 @@ class MoonLocation(u.Quantity):
 
     def __array_finalize__(self, obj):
         super().__array_finalize__(obj)
+        if hasattr(obj, "_ellipsoid"):
+            self._ellipsoid = obj._ellipsoid
 
     def __len__(self):
         if self.shape == ():
