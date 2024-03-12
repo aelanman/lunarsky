@@ -6,6 +6,7 @@ from astropy import units as un
 from astropy.utils import IncompatibleShapeError, exceptions
 from astropy.tests.helper import assert_quantity_allclose
 import lunarsky
+from lunarsky.moon import SELENOIDS
 import pytest
 
 try:
@@ -59,10 +60,11 @@ def test_icrs_to_topo_long_time(time, lat, lon, grcat):
         (jd_4mo[:2], [10.3, 11.2], [0.0, 1.4]),
     ],
 )
-def test_transform_loops(obj, path, time, lat, lon):
+@pytest.mark.parametrize("ell", SELENOIDS)
+def test_transform_loops(obj, path, time, lat, lon, ell):
     # Tests from ICRS -> path -> ICRS
     obj = lunarsky.SkyCoord(obj)  # Ensure we're working with lunarsky-compatible SkyCoord
-    loc = lunarsky.MoonLocation.from_selenodetic(lat, lon)
+    loc = lunarsky.MoonLocation.from_selenodetic(lat, lon, ellipsoid=ell)
     fdict = {
         "lunartopo": lunarsky.LunarTopo(location=loc, obstime=time),
         "mcmf": lunarsky.MCMF(obstime=time),
@@ -80,9 +82,10 @@ def test_transform_loops(obj, path, time, lat, lon):
     assert_quantity_allclose(obj.cartesian.xyz, orig_pos, atol=tol)
 
 
-def test_topo_to_topo():
+@pytest.mark.parametrize("ell", SELENOIDS)
+def test_topo_to_topo(ell):
     # Check that zenith source transforms properly
-    loc0 = lunarsky.MoonLocation.from_selenodetic(lat=0, lon=90)
+    loc0 = lunarsky.MoonLocation.from_selenodetic(lat=0, lon=90, ellipsoid=ell)
     loc1 = lunarsky.MoonLocation.from_selenodetic(lat=0, lon=0)
 
     src = lunarsky.SkyCoord(alt="90d", az="0d", frame="lunartopo", location=loc0)
@@ -109,7 +112,8 @@ def test_mcmf_to_mcmf():
     # Tolerance to allow for lunar precession / nutation.
 
 
-def test_earth_from_moon():
+@pytest.mark.parametrize("ell", SELENOIDS.keys())
+def test_earth_from_moon(ell):
     # Look at the position of the Earth in lunar reference frames.
 
     # The lunar apo/perigee vary over time. These are
@@ -138,7 +142,7 @@ def test_earth_from_moon():
 
     # Now test LunarTopo frame positions
     lat, lon = 0, 0  # deg
-    loc = lunarsky.MoonLocation.from_selenodetic(lat, lon)
+    loc = lunarsky.MoonLocation.from_selenodetic(lat, lon, ellipsoid=ell)
     topo = mcmf.transform_to(lunarsky.LunarTopo(location=loc, obstime=jd_4mo))
 
     # The Earth should stay within 10 deg of zenith of lat=lon=0 position
@@ -273,22 +277,24 @@ def test_incompatible_transform(fromframe):
         src.transform_to(ltop)
 
 
-def test_finite_vs_spherical():
-    # Transform MCMF coordinates with distance and without
+@pytest.mark.parametrize("ell", SELENOIDS)
+def test_finite_vs_spherical(ell):
+    # Transform MCMF coordinates with distance and without units
+    # Check consistency with ellipsoid equatorial radius
     # Assumes infinite distance if no unit given, as astropy does.
-    R0 = 2e3
-    N = 100
-    phi = np.linspace(0, 2 * np.pi, N)
-    xyz = R0 * un.km * np.array([np.cos(phi), np.sin(phi), np.zeros(N)])
-    with_units = lunarsky.SkyCoord(lunarsky.MCMF(*xyz))
-    xyz = R0 * np.array([np.cos(phi), np.sin(phi), np.zeros(N)])
-    sans_units = lunarsky.SkyCoord(lunarsky.MCMF(*xyz))
 
-    loc = lunarsky.MoonLocation.from_selenodetic(lon=180 * un.deg, lat=0, height=0)
+    R0 = 404789     # km
+    xyz = np.array([[R0, -R0], [0, 0], [0, 0]])
+    with_units = lunarsky.SkyCoord(lunarsky.MCMF(*(xyz * un.km)))
+    sans_units = lunarsky.SkyCoord(lunarsky.MCMF(*(xyz)))
+
+    loc = lunarsky.MoonLocation.from_selenodetic(
+        lon=180 * un.deg, lat=0, height=0, ellipsoid=ell
+    )
     altaz_with_units = with_units.transform_to(lunarsky.LunarTopo(location=loc))
     with pytest.warns(exceptions.AstropyUserWarning, match="Coordinates do not "):
         altaz_sans_units = sans_units.transform_to(lunarsky.LunarTopo(location=loc))
 
-    radius = lunarsky.spice_utils.LUNAR_RADIUS * un.m
-    assert np.all(altaz_with_units.distance < radius + R0 * un.km)
+    dists = R0 * un.km + np.array([1, -1]) * SELENOIDS[ell]._equatorial_radius
+    assert np.all(altaz_with_units.distance == dists)
     assert_quantity_allclose(altaz_sans_units.distance, 1.0)

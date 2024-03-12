@@ -87,31 +87,25 @@ class LunarTopo(BaseCoordinateFrame):
 # Helper functions
 # -----------------
 
-
-def _spice_setup(latitude, longitude, station_id):
-
-    latlonids = np.stack(
-        [np.atleast_1d(latitude), np.atleast_1d(longitude), station_id]
-    ).T
-    if latlonids.ndim == 1:
-        latlonids = latlonids[None, :]
-
-    for lat, lon, sid in latlonids:
-        sid = int(sid)  # Station IDs must be ints, but are converted to float above.
+def _spice_setup(locations, station_ids):
+    for li, loc in enumerate(np.atleast_1d(locations)):
+        sid = int(station_ids[li])
         frameloaded = check_is_loaded(f"FRAME_LUNAR-TOPO-{sid}")
         if not frameloaded:
             lunar_surface_ephem(
-                lat, lon, station_num=sid
+                loc.x.to_value('km'),
+                loc.y.to_value('km'),
+                loc.z.to_value('km'),
+                station_num=sid
             )  # Furnishes SPK for lunar surface point
             station_name, idnum, frame_specs, latlon = topo_frame_def(
-                lat, lon, moon=True, station_num=sid
+                loc.lat.deg, loc.lon.deg, moon=True, station_num=sid
             )
             frame_strs = ["{}={}".format(k, v) for (k, v) in frame_specs.items()]
             spice.lmpool(frame_strs)
 
 
 def make_transform(coo, toframe):
-
     ap_to_spice = {"icrs": ("J2000", 0), "mcmf": ("MOON_ME", 301)}
     # Get target frame and source frame names
     if isinstance(coo, LunarTopo):
@@ -138,7 +132,8 @@ def make_transform(coo, toframe):
     shape_out = check_broadcast(coo.shape, ets.shape, location.shape)
 
     # Set up SPICE ephemerides and frame details
-    _spice_setup(location.lat.deg, location.lon.deg, stat_ids)
+    ## Use MCMF cartesian position
+    _spice_setup(location, stat_ids)
 
     ets_ids = np.atleast_2d(np.stack(np.broadcast_arrays(ets, stat_ids)).T)
 
@@ -205,13 +200,11 @@ def make_transform(coo, toframe):
 # -----------------
 @frame_transform_graph.transform(FunctionTransformWithFiniteDifference, ICRS, LunarTopo)
 def icrs_to_lunartopo(icrs_coo, topo_frame):
-
     return make_transform(icrs_coo, topo_frame)
 
 
 @frame_transform_graph.transform(FunctionTransformWithFiniteDifference, LunarTopo, ICRS)
 def lunartopo_to_icrs(topo_coo, icrs_frame):
-
     return make_transform(topo_coo, icrs_frame)
 
 
@@ -220,13 +213,11 @@ def mcmf_to_lunartopo(mcmf_coo, topo_frame):
     # TODO:
     #   > What if mcmf_coo and topo_frame have different obstimes?
     #   > What if location has obstime?
-
     return make_transform(mcmf_coo, topo_frame)
 
 
 @frame_transform_graph.transform(FunctionTransformWithFiniteDifference, LunarTopo, MCMF)
 def lunartopo_to_mcmf(topo_coo, mcmf_frame):
-
     return make_transform(topo_coo, mcmf_frame)
 
 
