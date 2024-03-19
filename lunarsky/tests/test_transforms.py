@@ -15,11 +15,16 @@ except ImportError:
     from astropy.coordinates.angle_utilities import angular_separation
 
 # Lunar station positions
-Nangs = 3
+Nangs = 7
 latitudes = np.linspace(-90, 90, Nangs)
 longitudes = np.linspace(0, 360, Nangs)
 latlons_grid = [(lat, lon) for lon in longitudes for lat in latitudes]
 
+# Avoiding poles:
+latlons_grid_nopole = [
+    (lat, lon) for lon in np.linspace(0.1, 360, Nangs, endpoint=False)
+    for lat in np.linspace(-70.0, 70.0, Nangs, endpoint=False)
+]
 
 # Times
 t0 = Time("2020-10-28T15:30:00")
@@ -298,3 +303,44 @@ def test_finite_vs_spherical(ell):
     dists = R0 * un.km + np.array([1, -1]) * SELENOIDS[ell]._equatorial_radius
     assert np.all(altaz_with_units.distance == dists)
     assert_quantity_allclose(altaz_sans_units.distance, 1.0)
+
+@pytest.mark.parametrize("ell", SELENOIDS)
+@pytest.mark.parametrize("lat,lon", latlons_grid_nopole)
+def test_topo_zenith_shift(ell, lat, lon):
+    # Verify that a given source at zenith in one topo frame shifts
+    # predictably when viewed from a topo frame with the same lat/lon but
+    # different ellipsoid
+
+    # Checking that the ellipsoid is interpreted correctly
+
+    # This test is a little sketchy... will need to review this later.
+    #   Some discrepancies for GRAIL23 selenoid when the source distance is large. Chooseing 1000 km for now.
+    #   Also fails near poles.
+
+    # Comparing against the SPHERE ellipsoid. Test fails for this due to divide by zero
+    if ell == "SPHERE":
+        return
+
+    lat *= un.deg
+    lon *= un.deg
+
+    loc0 = lunarsky.MoonLocation.from_selenodetic(lon, lat, ellipsoid='SPHERE')     # For reference.
+    loc1 = lunarsky.MoonLocation.from_selenodetic(lon, lat, ellipsoid=ell)       # Same lat/lon = different place for different ellipsoid
+
+    # Zenith source at finite distance over loc0.
+    src0 = lunarsky.SkyCoord(alt='90d', az='0d', distance=1e3 * un.km, frame=lunarsky.LunarTopo(location=loc0, obstime=Time.now()))
+    src1 = src0.transform_to(lunarsky.LunarTopo(location=loc1))
+
+    # Law of sines:
+    #   Geometry among zenith angle, mcmf station vector,
+    #   and selenocentric vs. selenodetic latitudes
+
+    R1 = loc1.mcmf.cartesian.norm()
+    lat_cen = loc1.mcmf.spherical.lat
+    lat_det = loc1.lat
+    diff = (src1.distance / np.sin((np.abs(lat_det - lat_cen)).rad)) - (R1 / np.sin(src1.zen.rad))
+    assert_quantity_allclose(
+        src1.distance / np.sin((np.abs(lat_det - lat_cen)).rad),
+        R1 / np.sin(src1.zen.rad),
+        atol=1*un.km,
+    )
