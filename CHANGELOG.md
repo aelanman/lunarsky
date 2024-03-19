@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+## Added
+- Support for ellipsoid models for selenodetic coordinates (non-spherical)
+
 ## [0.2.0] -- 2022-10-12
 
 ## Fixed
