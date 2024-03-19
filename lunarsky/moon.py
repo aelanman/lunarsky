@@ -7,7 +7,6 @@ from astropy.coordinates.earth import GeodeticLocation
 from astropy.coordinates.representation.geodetic import BaseGeodeticRepresentation
 from astropy.coordinates.representation import (
     CartesianRepresentation,
-    SphericalRepresentation,
 )
 from astropy.coordinates.attributes import Attribute
 
@@ -17,29 +16,36 @@ LUNAR_RADIUS = 1737.1e3  # m
 
 __all__ = ["MoonLocation", "MoonLocationAttribute"]
 
+
 class SPHERESelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid as a sphere
 
-        Radius defined by lunarsky.spice_utils.LUNAR_RADIUS
+    Radius defined by lunarsky.spice_utils.LUNAR_RADIUS
     """
-    _equatorial_radius = LUNAR_RADIUS * u.m 
+
+    _equatorial_radius = LUNAR_RADIUS * u.m
     _flattening = 0.0
+
 
 class GSFCSelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid from NASA/GSFC "Planetary Fact Sheet"
 
-       https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
+    https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
     """
+
     _equatorial_radius = 1738.1e3 * u.m
     _flattening = 0.0012
+
 
 class GRAIL23SelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid defined by gravimetry of GRAIL data.
 
     https://doi.org/10.1007/s40328-023-00415-w
     """
+
     _equatorial_radius = 1737576.6 * u.m
     _flattening = 0.000305
+
 
 class CE1LAM10SelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid from Chang'e 1 laser altimetry.
@@ -48,16 +54,17 @@ class CE1LAM10SelenodeticRepresentation(BaseGeodeticRepresentation):
 
     https://doi.org/10.1007/s11430-010-4060-6
     """
+
     _equatorial_radius = 1737.632 * u.km
-    _flattening = 1/973.463
+    _flattening = 1 / 973.463
 
 
 # Define reference ellipsoids
 SELENOIDS = {
-    "SPHERE" : SPHERESelenodeticRepresentation,
-    "GSFC" : GSFCSelenodeticRepresentation,
-    "GRAIL23" : GRAIL23SelenodeticRepresentation,
-    "CE-1-LAM-GEO" : CE1LAM10SelenodeticRepresentation,
+    "SPHERE": SPHERESelenodeticRepresentation,
+    "GSFC": GSFCSelenodeticRepresentation,
+    "GRAIL23": GRAIL23SelenodeticRepresentation,
+    "CE-1-LAM-GEO": CE1LAM10SelenodeticRepresentation,
 }
 
 
@@ -242,7 +249,9 @@ class MoonLocation(u.Quantity):
             raise ValueError("Too many unique MoonLocation objects open at once.")
 
         for llh in llh_arr:
-            lonlatheight = "_".join(["{:.4f}".format(ll) for ll in llh] + [inst._ellipsoid])
+            lonlatheight = "_".join(
+                ["{:.4f}".format(ll) for ll in llh] + [inst._ellipsoid]
+            )
             if lonlatheight not in cls._existing_locs:
                 new_stat_id = cls._avail_stat_ids.pop()
                 cls._existing_locs.append(lonlatheight)
@@ -451,9 +460,7 @@ class MoonLocation(u.Quantity):
         return SelenodeticLocation(
             Longitude(llh.lon, u.degree, wrap_angle=180.0 * u.degree, copy=False),
             Latitude(llh.lat, u.degree, copy=False),
-            u.Quantity(
-                llh.height, self.unit, copy=False
-            ),
+            u.Quantity(llh.height, self.unit, copy=False),
         )
 
     @property

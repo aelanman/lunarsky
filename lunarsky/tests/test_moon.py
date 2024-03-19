@@ -3,7 +3,9 @@ import copy
 import numpy as np
 import astropy.units as unit
 from astropy.coordinates import Longitude, Latitude
+from astropy.tests.helper import quantity_allclose
 from lunarsky import MoonLocation, MoonLocationAttribute, MCMF
+from lunarsky.moon import SELENOIDS
 
 
 class TestsWithObject:
@@ -27,7 +29,12 @@ class TestsWithObject:
         cartesian = MoonLocation(self.x.value, self.y.value, self.z.value, self.x.unit)
         assert np.all(cartesian == self.location)
         spherical = MoonLocation(self.lon.deg, self.lat.deg, self.h.to(unit.m))
-        assert np.all(spherical == self.location)
+        # TODO this was just np.all(... == ...). Seeing floating point diff since v0.2.2
+        assert quantity_allclose(
+            spherical.mcmf.cartesian.xyz,
+            self.location.mcmf.cartesian.xyz,
+            atol=1e-9 * unit.m,
+        )
 
     def test_invalid(self):
         # incomprehensible by either raises TypeError
@@ -130,7 +137,8 @@ def test_moonlocation_delete():
     assert check1 == before
 
 
-def test_station_ids():
+@pytest.mark.parametrize("ell", SELENOIDS)
+def test_station_ids(ell):
     # Check that when a MoonLocations are made, the appropriate station_ids are assigned.
 
     # Get whatever are already recorded in the class.
@@ -186,7 +194,11 @@ def test_station_ids():
 
     for gp in lonlatheights:
         lons, lats, heights = np.array(gp).T
-        locs.append(MoonLocation.from_selenodetic(lat=lats, lon=lons, height=heights))
+        locs.append(
+            MoonLocation.from_selenodetic(
+                lat=lats, lon=lons, height=heights, ellipsoid=ell
+            )
+        )
         locs[-1]._set_station_id()
 
     # Check that only unique positions got added
@@ -209,7 +221,7 @@ def test_station_ids():
         else:
             llh_arr = zip(inst.lon.deg, inst.lat.deg, inst.height.to_value("km"))
         for llh in llh_arr:
-            llhs.append("_".join(["{:.4f}".format(ll) for ll in llh]))
+            llhs.append("_".join(["{:.4f}".format(ll) for ll in llh] + [ell]))
         locstrs.append(llhs)
 
     # Check that saved location strings correspond with station IDs in each instance

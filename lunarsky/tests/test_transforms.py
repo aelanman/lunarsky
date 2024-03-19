@@ -22,7 +22,8 @@ latlons_grid = [(lat, lon) for lon in longitudes for lat in latitudes]
 
 # Avoiding poles:
 latlons_grid_nopole = [
-    (lat, lon) for lon in np.linspace(0.1, 360, Nangs, endpoint=False)
+    (lat, lon)
+    for lon in np.linspace(0.1, 360, Nangs, endpoint=False)
     for lat in np.linspace(-70.0, 70.0, Nangs, endpoint=False)
 ]
 
@@ -110,9 +111,7 @@ def test_mcmf_to_mcmf():
     )
     sph0 = src.spherical
     sph1 = orig_pos.spherical
-    res = angular_separation(
-        sph0.lon, sph0.lat, sph1.lon, sph1.lat
-    ).to("deg")
+    res = angular_separation(sph0.lon, sph0.lat, sph1.lon, sph1.lat).to("deg")
     assert_quantity_allclose(res, 177 * un.deg, atol=5 * un.deg)
     # Tolerance to allow for lunar precession / nutation.
 
@@ -288,7 +287,7 @@ def test_finite_vs_spherical(ell):
     # Check consistency with ellipsoid equatorial radius
     # Assumes infinite distance if no unit given, as astropy does.
 
-    R0 = 404789     # km
+    R0 = 404789  # km
     xyz = np.array([[R0, -R0], [0, 0], [0, 0]])
     with_units = lunarsky.SkyCoord(lunarsky.MCMF(*(xyz * un.km)))
     sans_units = lunarsky.SkyCoord(lunarsky.MCMF(*(xyz)))
@@ -304,6 +303,7 @@ def test_finite_vs_spherical(ell):
     assert np.all(altaz_with_units.distance == dists)
     assert_quantity_allclose(altaz_sans_units.distance, 1.0)
 
+
 @pytest.mark.parametrize("ell", SELENOIDS)
 @pytest.mark.parametrize("lat,lon", latlons_grid_nopole)
 def test_topo_zenith_shift(ell, lat, lon):
@@ -314,7 +314,8 @@ def test_topo_zenith_shift(ell, lat, lon):
     # Checking that the ellipsoid is interpreted correctly
 
     # This test is a little sketchy... will need to review this later.
-    #   Some discrepancies for GRAIL23 selenoid when the source distance is large. Chooseing 1000 km for now.
+    #   Some discrepancies for GRAIL23 selenoid when the source distance is large.
+    #       Choosing 1000 km for now.
     #   Also fails near poles.
 
     # Comparing against the SPHERE ellipsoid. Test fails for this due to divide by zero
@@ -324,11 +325,20 @@ def test_topo_zenith_shift(ell, lat, lon):
     lat *= un.deg
     lon *= un.deg
 
-    loc0 = lunarsky.MoonLocation.from_selenodetic(lon, lat, ellipsoid='SPHERE')     # For reference.
-    loc1 = lunarsky.MoonLocation.from_selenodetic(lon, lat, ellipsoid=ell)       # Same lat/lon = different place for different ellipsoid
+    loc0 = lunarsky.MoonLocation.from_selenodetic(
+        lon, lat, ellipsoid="SPHERE"
+    )  # For reference.
+    loc1 = lunarsky.MoonLocation.from_selenodetic(
+        lon, lat, ellipsoid=ell
+    )  # Same lat/lon = different place for different ellipsoid
 
     # Zenith source at finite distance over loc0.
-    src0 = lunarsky.SkyCoord(alt='90d', az='0d', distance=1e3 * un.km, frame=lunarsky.LunarTopo(location=loc0, obstime=Time.now()))
+    src0 = lunarsky.SkyCoord(
+        alt="90d",
+        az="0d",
+        distance=1e3 * un.km,
+        frame=lunarsky.LunarTopo(location=loc0, obstime=Time.now()),
+    )
     src1 = src0.transform_to(lunarsky.LunarTopo(location=loc1))
 
     # Law of sines:
@@ -338,9 +348,8 @@ def test_topo_zenith_shift(ell, lat, lon):
     R1 = loc1.mcmf.cartesian.norm()
     lat_cen = loc1.mcmf.spherical.lat
     lat_det = loc1.lat
-    diff = (src1.distance / np.sin((np.abs(lat_det - lat_cen)).rad)) - (R1 / np.sin(src1.zen.rad))
     assert_quantity_allclose(
         src1.distance / np.sin((np.abs(lat_det - lat_cen)).rad),
         R1 / np.sin(src1.zen.rad),
-        atol=1*un.km,
+        atol=1 * un.km,
     )

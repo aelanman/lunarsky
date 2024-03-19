@@ -87,16 +87,17 @@ class LunarTopo(BaseCoordinateFrame):
 # Helper functions
 # -----------------
 
+
 def _spice_setup(locations, station_ids):
     for li, loc in enumerate(np.atleast_1d(locations)):
         sid = int(station_ids[li])
         frameloaded = check_is_loaded(f"FRAME_LUNAR-TOPO-{sid}")
         if not frameloaded:
             lunar_surface_ephem(
-                loc.x.to_value('km'),
-                loc.y.to_value('km'),
-                loc.z.to_value('km'),
-                station_num=sid
+                loc.x.to_value("km"),
+                loc.y.to_value("km"),
+                loc.z.to_value("km"),
+                station_num=sid,
             )  # Furnishes SPK for lunar surface point
             station_name, idnum, frame_specs, latlon = topo_frame_def(
                 loc.lat.deg, loc.lon.deg, moon=True, station_num=sid
@@ -132,7 +133,6 @@ def make_transform(coo, toframe):
     shape_out = check_broadcast(coo.shape, ets.shape, location.shape)
 
     # Set up SPICE ephemerides and frame details
-    ## Use MCMF cartesian position
     _spice_setup(location, stat_ids)
 
     ets_ids = np.atleast_2d(np.stack(np.broadcast_arrays(ets, stat_ids)).T)

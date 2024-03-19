@@ -15,6 +15,7 @@ _J2000 = Time("J2000")
 
 TEMPORARY_KERNEL_DIR = tempfile.TemporaryDirectory()
 
+
 def check_is_loaded(search):
     """
     Search the kernel pool variable names for a given string.
