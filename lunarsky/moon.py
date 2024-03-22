@@ -81,16 +81,6 @@ def _check_ellipsoid(ellipsoid=None, default="SPHERE"):
     return ellipsoid
 
 
-def _add_rm_ellipsoid(ellipsoid, name, add=True):
-    """Add or remove an ellipsoid class from SELENOIDS.
-    Needed for testing."""
-    global SELENOIDS
-    if add:
-        SELENOIDS[name] = ellipsoid
-    else:
-        SELENOIDS.pop(name, None)
-
-
 class MoonLocationInfo(QuantityInfoBase):
     """
     Container for meta information like name, description, format.  This is
