@@ -5,6 +5,9 @@
 ## Added
 - Support for ellipsoid models for selenodetic coordinates (non-spherical)
 
+## Deprecated
+- Removed support for Python < 3.9. Astropy >= 6.0 is required for ellipsoid support
+
 ## [0.2.0] -- 2022-10-12
 
 ## Fixed
