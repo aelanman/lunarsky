@@ -379,7 +379,7 @@ class MoonLocation(u.Quantity):
         selenodetic = SELENOIDS[ellipsoid](lon, lat, height, copy=False)
         xyz = selenodetic.to_cartesian().get_xyz(xyz_axis=-1) << height.unit
         self = xyz.view(cls._location_dtype, cls).reshape(selenodetic.shape)
-        self._ellipsoid = ellipsoid
+        self.ellipsoid = ellipsoid
         return self
 
     def __str__(self):
