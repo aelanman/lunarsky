@@ -2,10 +2,11 @@ import pytest
 import copy
 import numpy as np
 import astropy.units as unit
-from astropy.coordinates import Longitude, Latitude
+from astropy.coordinates import Longitude, Latitude, SphericalRepresentation, SphericalDifferential
 from astropy.tests.helper import quantity_allclose
+from astropy.coordinates.tests.test_representation import representation_equal
 from lunarsky import MoonLocation, MoonLocationAttribute, MCMF
-from lunarsky.moon import SELENOIDS
+from lunarsky.moon import SELENOIDS, MoonLocationInfo
 
 
 class TestsWithObject:
@@ -21,7 +22,7 @@ class TestsWithObject:
         self.lat = Latitude([+0.0, 30.0, 60.0, +90.0, -90.0, -60.0, -30.0, 0.0], unit.deg)
         self.h = unit.Quantity([0.1, 0.5, 1.0, -0.5, -1.0, +4.2, -11.0, -0.1], unit.m)
         self.location = MoonLocation.from_selenodetic(self.lon, self.lat, self.h)
-        self.x, self.y, self.z = self.location.to_selenocentric()
+        self.x, self.y, self.z = self.location.selenocentric
 
     def test_input(self):
         cartesian = MoonLocation(self.x, self.y, self.z)
@@ -67,6 +68,10 @@ class TestsWithObject:
         # inconsistent shape
         with pytest.raises(ValueError):
             MoonLocation.from_selenodetic(self.lon, self.lat, self.h[:5])
+
+        # invalid ellipsoid
+        with pytest.raises(ValueError):
+            loc = MoonLocation.from_selenodetic(self.lon, self.lat, self.h, ellipsoid="INVALID")
 
     def test_attributes(self):
         assert np.allclose(self.location.height, self.h)
