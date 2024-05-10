@@ -2,6 +2,7 @@
 
 import numpy as np
 import astropy
+from astropy import version
 from astropy.coordinates import EarthLocation, Longitude
 
 from .moon import MoonLocation
@@ -49,7 +50,10 @@ class Time(astropy.time.Time):
         )
 
         if isinstance(location, MoonLocation):
-            self.location = location
+            if (version.major == 6 and version.minor >= 1) or version.major > 6:
+                self._location = location
+            else:
+                self.location = location
 
     def sidereal_time(self, kind, longitude=None, model=None):
         # Currently returns the zenith RA as the LST.
