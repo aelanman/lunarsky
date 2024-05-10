@@ -13,7 +13,7 @@ def test_sidereal_time_calculation(lat, lon):
 
     t0 = Time.now()
     loc = MoonLocation.from_selenodetic(lon, lat, 0)
-    t0.location = loc
+    t0 = Time(t0, location=loc)
 
     Ntimes = 200
     Ndays = 28
