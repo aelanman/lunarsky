@@ -50,9 +50,8 @@ class Time(astropy.time.Time):
         )
 
         if isinstance(location, MoonLocation):
-            # Avoids a deprecation warning in astropy >= 6.1, while 
-            # maintaining compatibility with earlier versions.
             if (version.major == 6 and version.minor >= 1) or version.major > 6:
+                # In astropy >= 6.1, time.Time.location is a property that shouldn't be set directly
                 self._location = location
             else:
                 self.location = location
