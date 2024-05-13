@@ -1,6 +1,11 @@
 # Changelog
 
-## [0.2.2] -- 2022-03-19
+## [0.2.3] -- 2024-05-13
+
+## Fixed
+- Make lunarsky.time.Time location handling compatible with astropy >= 6.1
+
+## [0.2.2] -- 2024-03-19
 
 ## Added
 - Support for ellipsoid models for selenodetic coordinates (non-spherical)
