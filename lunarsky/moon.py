@@ -9,6 +9,7 @@ from astropy.coordinates.representation import (
     CartesianRepresentation,
 )
 from astropy.coordinates.attributes import Attribute
+from astropy.utils.compat import COPY_IF_NEEDED
 
 from .spice_utils import remove_topo
 
@@ -134,7 +135,7 @@ class MoonLocationInfo(QuantityInfoBase):
         # selenodetic coordinates.
         shape = (length,) + attrs.pop("shape")
         data = u.Quantity(
-            np.zeros(shape=shape, dtype=cols[0].dtype), unit=cols[0].unit, copy=False
+            np.zeros(shape=shape, dtype=cols[0].dtype), unit=cols[0].unit, copy=COPY_IF_NEEDED
         )
         # Get arguments needed to reconstruct class
         map = {
@@ -303,9 +304,9 @@ class MoonLocation(u.Quantity):
             )
 
         try:
-            x = u.Quantity(x, unit, copy=False)
-            y = u.Quantity(y, unit, copy=False)
-            z = u.Quantity(z, unit, copy=False)
+            x = u.Quantity(x, unit, copy=COPY_IF_NEEDED)
+            y = u.Quantity(y, unit, copy=COPY_IF_NEEDED)
+            z = u.Quantity(z, unit, copy=COPY_IF_NEEDED)
         except u.UnitsError:
             raise u.UnitsError(
                 "Selenocentric coordinate units should all be " "consistent."
@@ -314,7 +315,7 @@ class MoonLocation(u.Quantity):
         x, y, z = np.broadcast_arrays(x, y, z)
         struc = np.empty(x.shape, cls._location_dtype)
         struc["x"], struc["y"], struc["z"] = x, y, z
-        inst = super().__new__(cls, struc, unit, copy=False)
+        inst = super().__new__(cls, struc, unit, copy=COPY_IF_NEEDED)
 
         return inst
 
@@ -361,11 +362,11 @@ class MoonLocation(u.Quantity):
 
         """
         ellipsoid = _check_ellipsoid(ellipsoid, default=cls._ellipsoid)
-        lon = Longitude(lon, u.degree, copy=False).wrap_at(180 * u.degree)
-        lat = Latitude(lat, u.degree, copy=False)
+        lon = Longitude(lon, u.degree, copy=COPY_IF_NEEDED).wrap_at(180 * u.degree)
+        lat = Latitude(lat, u.degree, copy=COPY_IF_NEEDED)
         # don't convert to m by default, so we can use the height unit below.
         if not isinstance(height, u.Quantity):
-            height = u.Quantity(height, u.m, copy=False)
+            height = u.Quantity(height, u.m, copy=COPY_IF_NEEDED)
 
         if not lon.shape == lat.shape:
             raise ValueError(
@@ -376,7 +377,7 @@ class MoonLocation(u.Quantity):
 
         # get selenocentric coordinates. Have to give one-dimensional array.
 
-        selenodetic = SELENOIDS[ellipsoid](lon, lat, height, copy=False)
+        selenodetic = SELENOIDS[ellipsoid](lon, lat, height, copy=COPY_IF_NEEDED)
         xyz = selenodetic.to_cartesian().get_xyz(xyz_axis=-1) << height.unit
         self = xyz.view(cls._location_dtype, cls).reshape(selenodetic.shape)
         self.ellipsoid = ellipsoid
@@ -444,13 +445,13 @@ class MoonLocation(u.Quantity):
         """
         ellipsoid = _check_ellipsoid(ellipsoid, default=self.ellipsoid)
         xyz = self.view(self._array_dtype, u.Quantity)
-        llh = CartesianRepresentation(xyz, xyz_axis=-1, copy=False).represent_as(
+        llh = CartesianRepresentation(xyz, xyz_axis=-1, copy=COPY_IF_NEEDED).represent_as(
             SELENOIDS[ellipsoid],
         )
         return SelenodeticLocation(
-            Longitude(llh.lon, u.degree, wrap_angle=180.0 * u.degree, copy=False),
-            Latitude(llh.lat, u.degree, copy=False),
-            u.Quantity(llh.height, self.unit, copy=False),
+            Longitude(llh.lon, u.degree, wrap_angle=180.0 * u.degree, copy=COPY_IF_NEEDED),
+            Latitude(llh.lat, u.degree, copy=COPY_IF_NEEDED),
+            u.Quantity(llh.height, self.unit, copy=COPY_IF_NEEDED),
         )
 
     @property
