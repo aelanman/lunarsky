@@ -3,6 +3,7 @@
 import numpy as np
 import astropy
 from astropy import version
+from astropy.utils.compat import COPY_IF_NEEDED
 from astropy.coordinates import EarthLocation, Longitude
 
 from .moon import MoonLocation
@@ -30,7 +31,7 @@ class Time(astropy.time.Time):
         in_subfmt=None,
         out_subfmt=None,
         location=None,
-        copy=False,
+        copy=COPY_IF_NEEDED,
     ):
 
         super_loc = None
