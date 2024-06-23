@@ -135,7 +135,9 @@ class MoonLocationInfo(QuantityInfoBase):
         # selenodetic coordinates.
         shape = (length,) + attrs.pop("shape")
         data = u.Quantity(
-            np.zeros(shape=shape, dtype=cols[0].dtype), unit=cols[0].unit, copy=COPY_IF_NEEDED
+            np.zeros(shape=shape, dtype=cols[0].dtype),
+            unit=cols[0].unit,
+            copy=COPY_IF_NEEDED,
         )
         # Get arguments needed to reconstruct class
         map = {
@@ -449,7 +451,9 @@ class MoonLocation(u.Quantity):
             SELENOIDS[ellipsoid],
         )
         return SelenodeticLocation(
-            Longitude(llh.lon, u.degree, wrap_angle=180.0 * u.degree, copy=COPY_IF_NEEDED),
+            Longitude(
+                llh.lon, u.degree, wrap_angle=180.0 * u.degree, copy=COPY_IF_NEEDED
+            ),
             Latitude(llh.lat, u.degree, copy=COPY_IF_NEEDED),
             u.Quantity(llh.height, self.unit, copy=COPY_IF_NEEDED),
         )
