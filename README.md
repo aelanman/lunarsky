@@ -46,14 +46,14 @@ with the moon. This is chosen to be the Mean Earth/Polar frame, with a Z axis de
 * LunarTopo – A topocentric (East/North/Up) frame defined at a position on the Moon's surface. This is analogous to `astropy.coordinates.builtin.AltAz`.
 * `MoonLocation` – Analogous to the `astropy.coordinates.EarthLocation` class, this describes
 positions on the Moon in either selenocentric (x, y, z) or selenodetic (lat, lon, height) coordinates.
-The cartesian axes of the selenocentric system are those of the MCMF frame. In the selenodetic coordinates, "height" is defined relative to a sphere of radius 1737.1 km.
+The cartesian axes of the selenocentric system are those of the MCMF frame. Selenodetic coordinates can be defined relative to a few different ellipsoid models, but the default is just a sphere of radius 1737.1 km.
 * `SkyCoord` – A replacement for `astropy.coordinates.SkyCoord`, with modifications that ensure compatibility with the `MoonLocation` class.
 * `Time` – A replacement for the `astropy.time.Time` class, which can accept a `MoonLocation` instance as its location parameter, allowing for the calculation of local sidereal times on the Moon. The LST of an observer on the Moon is defined as the right ascension of the zenith.
 
 
 ## Credit
 
-This package makes use fo the ``spiceypy`` wrapper [2] for the JPL SPICE Toolkit, produced by the NASA Navigation and Ancillary Information Facility (NAIF) [3] [4]. The transformations are defined using data in kernel files ``pck/moon_pa_de421_1900-2050.bpc``, ``moon_080317.tf``, and ``moon_assoc_me.tf``. These may be found at [the NAIF website](https://naif.jpl.nasa.gov/pub/naif/generic_kernels), and were produced by Nat Bachman (NAIF/JPL) in March 2008. Further information may be found in the comments in these files in the `data` directory.
+This package makes use of the ``spiceypy`` wrapper [2] for the JPL SPICE Toolkit, produced by the NASA Navigation and Ancillary Information Facility (NAIF) [3] [4]. The transformations are defined using data in kernel files ``pck/moon_pa_de421_1900-2050.bpc``, ``moon_080317.tf``, and ``moon_assoc_me.tf``. These may be found at [the NAIF website](https://naif.jpl.nasa.gov/pub/naif/generic_kernels), and were produced by Nat Bachman (NAIF/JPL) in March 2008. Further information may be found in the comments in these files in the `data` directory.
 
 ## References
 [1]: Ye, Hanlin, et al. "Looking Vector Direction Analysis for the Moon-Based Earth Observation Optical Sensor." IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing, vol. 11, no. 11, Nov. 2018, pp. 4488–99. IEEE Xplore, doi:10.1109/JSTARS.2018.2870247.
