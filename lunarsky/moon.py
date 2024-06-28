@@ -9,9 +9,11 @@ from astropy.coordinates.representation import (
     CartesianRepresentation,
 )
 from astropy.coordinates.attributes import Attribute
-from astropy.utils.compat import COPY_IF_NEEDED
+from astropy.utils import minversion
 
 from .spice_utils import remove_topo
+
+COPY_IF_NEEDED = None if minversion(np, "2.0") else False
 
 LUNAR_RADIUS = 1737.1e3  # m
 

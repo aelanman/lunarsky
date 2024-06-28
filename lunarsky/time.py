@@ -3,10 +3,9 @@
 import numpy as np
 import astropy
 from astropy import version
-from astropy.utils.compat import COPY_IF_NEEDED
 from astropy.coordinates import EarthLocation, Longitude
 
-from .moon import MoonLocation
+from .moon import MoonLocation, COPY_IF_NEEDED
 import spiceypy as spice
 
 __all__ = ["Time", "TimeDelta"]
