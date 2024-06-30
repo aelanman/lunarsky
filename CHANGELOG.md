@@ -1,7 +1,7 @@
 # Changelog
 
 
-## [0.2.5] -- 2024-06-26
+## [0.2.4] -- 2024-06-26
 
 ## Fixed
 - Maintain compatibility with astropy 6.0.0
