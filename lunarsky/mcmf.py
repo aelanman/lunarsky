@@ -5,7 +5,6 @@ from astropy.coordinates.representation import (
     CartesianDifferential,
     UnitSphericalRepresentation,
 )
-from astropy.utils import check_broadcast
 from astropy.coordinates.baseframe import (
     BaseCoordinateFrame,
     base_doc,
@@ -69,7 +68,7 @@ def make_transform(coo, toframe):
 
     # Make arrays
     ets = np.atleast_1d((obstime - _J2000).sec)
-    shape_out = check_broadcast(coo.shape, ets.shape)
+    shape_out = np.broadcast_shapes(coo.shape, ets.shape)
 
     coo_cart = coo.cartesian
 
