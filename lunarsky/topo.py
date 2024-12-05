@@ -7,7 +7,7 @@ from astropy.coordinates.representation import (
     UnitSphericalRepresentation,
     CartesianRepresentation,
 )
-from astropy.utils import check_broadcast, exceptions
+from astropy.utils import exceptions
 from astropy.coordinates.baseframe import (
     BaseCoordinateFrame,
     base_doc,
@@ -130,7 +130,7 @@ def make_transform(coo, toframe):
     # Make arrays
     ets = (obstime - _J2000).sec
     stat_ids = np.asarray(location.station_ids)
-    shape_out = check_broadcast(coo.shape, ets.shape, location.shape)
+    shape_out = np.broadcast_shapes(coo.shape, ets.shape, location.shape)
 
     # Set up SPICE ephemerides and frame details
     _spice_setup(location, stat_ids)

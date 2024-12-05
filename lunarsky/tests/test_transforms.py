@@ -3,7 +3,7 @@ from copy import deepcopy
 from lunarsky.time import Time, TimeDelta
 import astropy.coordinates as ac
 from astropy import units as un
-from astropy.utils import IncompatibleShapeError, exceptions
+from astropy.utils import exceptions
 from astropy.tests.helper import assert_quantity_allclose
 import lunarsky
 from lunarsky.moon import SELENOIDS
@@ -277,7 +277,7 @@ def test_incompatible_transform(fromframe):
         )
     )
     src = lunarsky.SkyCoord(coo)
-    with pytest.raises(IncompatibleShapeError):
+    with pytest.raises(ValueError, match="shape mismatch: objects cannot be broadcast to a single shape"):
         src.transform_to(ltop)
 
 
