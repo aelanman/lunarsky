@@ -277,7 +277,9 @@ def test_incompatible_transform(fromframe):
         )
     )
     src = lunarsky.SkyCoord(coo)
-    with pytest.raises(ValueError, match="shape mismatch: objects cannot be broadcast to a single shape"):
+    with pytest.raises(
+        ValueError, match="shape mismatch: objects cannot be broadcast to a single shape"
+    ):
         src.transform_to(ltop)
 
 
