@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.2.6] -- 2024-12-12
+## Fixed
+- Avoid deprecation warning with numpy.broadcast_shape
 
 ## [0.2.5] -- 2024-06-26
 
