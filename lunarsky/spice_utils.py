@@ -78,6 +78,7 @@ def download_big_kernels():
                     downloaded += len(cur_buf)
                     if total_size > 0:
                         pbar.update(downloaded // chunk_size)
+                    ofile.write(cur_buf)
 
     return paths
 
