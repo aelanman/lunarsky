@@ -72,6 +72,7 @@ def download_big_kernels():
                 chunk_size = max(4096, total_size // 20)
 
             downloaded = 0
+            os.makedirs(os.path.dirname(kf), exist_ok=True)
             with ProgressBar(total_size // chunk_size + 1, ipython_widget=False) as pbar, open(kf, 'wb') as ofile, FileLock(kf + ".lock"):
                 while cur_buf := response.read(chunk_size):
                     downloaded += len(cur_buf)
