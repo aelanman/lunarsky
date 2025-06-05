@@ -29,10 +29,6 @@ setup_args = {
         "write_to": "lunarsky/version.py",
     },
     "include_package_data": True,
-    "package_data":{
-            "lunarsky.data" : ["lunarsky/data/*"],
-            "lunarsky.tests": [],
-     },
     "test_suite": "pytest",
     "tests_require": ["pytest"],
     "setup_requires": ["pytest-runner", "setuptools_scm"],
