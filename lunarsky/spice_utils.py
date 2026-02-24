@@ -98,7 +98,7 @@ def lunar_surface_ephem(pos_x, pos_y, pos_z, station_num=98):
     frame = "MOON_ME"
     degree = 1
 
-    fname = os.path.join(TEMPORARY_KERNEL_DIR.name, f"lunar_points.bsp")
+    fname = os.path.join(TEMPORARY_KERNEL_DIR.name, "lunar_points.bsp")
     if os.path.exists(fname):
         spice.unload(fname)
         handle = spice.spkopa(fname)
@@ -174,7 +174,7 @@ def topo_frame_def(latitude, longitude, station_num=98, moon=True):
         k, v = map(str.strip, spec.split("="))
         frame_dict[k] = v
 
-    latlon = ["{:.4f}".format(l) for l in [latitude, longitude]]
+    latlon = ["{:.4f}".format(coord) for coord in [latitude, longitude]]
 
     return station_name, idnum, frame_dict, latlon
 

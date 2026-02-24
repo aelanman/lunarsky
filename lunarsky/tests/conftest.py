@@ -6,6 +6,7 @@ import warnings
 from lunarsky.spice_utils import remove_topo
 from lunarsky.moon import MoonLocation
 
+
 # Ignore deprecation warnings from spiceypy
 @pytest.fixture(autouse=True)
 def ignore_representation_deprecation():
