@@ -392,13 +392,11 @@ class MoonLocation(u.Quantity):
 
     def copy(self):
         # Necessary to preserve station_ids list
-        c = super().copy()
-        c.station_ids = self.station_ids
-        return c
+        return self.__copy__()
 
     def __copy__(self):
         # Ensure that the station_ids are copied as well under shallow copy
-        obj = copy.copy(super())
+        obj = super().copy()
         obj.station_ids = self.station_ids
         return obj
 
