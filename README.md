@@ -33,6 +33,14 @@ git clone https://github.com/aelanman/lunarsky
 python setup.py install
 ```
 
+Once you've installed lunarsky, you will need to ensure the relevant SPICE kernel files are downloaded
+before running. To do this, run:
+```
+from lunarsky import spice_utils
+spice_utils.download_big_kernels()
+```
+After that, the kernel files will be stored with the package data. This is around 150 MB.
+
 ## Usage
 
 ![mcmf_coords](./docs/figure.png)

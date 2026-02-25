@@ -1,7 +1,10 @@
 import numpy as np
 import os
+import urllib.request
+from filelock import FileLock
 import tempfile
-from astropy.utils.data import download_files_in_parallel
+import warnings
+from astropy.utils.console import ProgressBar
 from astropy.coordinates.matrix_utilities import rotation_matrix
 from astropy.time import Time
 import astropy.units as unit
@@ -46,28 +49,61 @@ def list_kernels():
             ktypes.append(dat[1])
     return knames, ktypes
 
+def download_big_kernels():
+    """
+    Download large (~150 MB) spice kernel files that can't be
+    included in the python package.
+
+    Installs them to the package data directory.
+    """
+    # LSK and DE430 Kernels
+    knames = ["lsk/naif0012.tls", "spk/planets/de430.bsp"]
+    _naif_kernel_url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
+    paths = []
+    for kern in knames:
+        kurl = _naif_kernel_url + kern
+        kf = os.path.join(DATA_PATH, kern)
+        paths.append(kf)
+        if os.path.exists(kf):
+            continue
+        with urllib.request.urlopen(kurl) as response:
+            total_size = int(response.headers.get("Content-Length", 0))
+            if total_size > 0:
+                chunk_size = max(4096, total_size // 20)
+
+            downloaded = 0
+            os.makedirs(os.path.dirname(kf), exist_ok=True)
+            with ProgressBar(total_size // chunk_size + 1, ipython_widget=False) as pbar, open(kf, 'wb') as ofile, FileLock(kf + ".lock"):
+                while cur_buf := response.read(chunk_size):
+                    downloaded += len(cur_buf)
+                    if total_size > 0:
+                        pbar.update(downloaded // chunk_size)
+                    ofile.write(cur_buf)
+
+    return paths
 
 def furnish_kernels():
     kernel_names = [
         "pck/moon_pa_de421_1900-2050.bpc",
         "fk/satellites/moon_080317.tf",
         "fk/satellites/moon_assoc_me.tf",
+        "lsk/naif0012.tls",
+        "spk/planets/de430.bsp"
     ]
     kernel_paths = [os.path.join(DATA_PATH, kn) for kn in kernel_names]
+    missing = []
+    for kp in kernel_paths:
+        if not os.path.exists(kp):
+            missing.append(os.path.basename(kp))
+    if len(missing) > 0:
+        warnings.warn(f"Missing kernel file(s). Please run "
+                             "lunarsky.spice_utils.download_big_kernels()")
+        return None
+
     for kp in kernel_paths:
         spice.furnsh(kp)
 
-    # LSK and DE430 Kernels
-    knames = ["lsk/naif0012.tls", "spk/planets/de430.bsp"]
-    _naif_kernel_url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
-    kurls = [_naif_kernel_url + kname for kname in knames]
-    paths = download_files_in_parallel(kurls, cache=True, show_progress=False)
-    for kp in paths:
-        kernel_paths.append(kp)
-        spice.furnsh(kp)
-
     return kernel_paths
-
 
 def lunar_surface_ephem(pos_x, pos_y, pos_z, station_num=98):
     """
@@ -225,6 +261,5 @@ def earth_pos_mcmf(obstimes):
     )
     earthpos = unit.Quantity(earthpos.T, "km")
     return MCMF(*earthpos, obstime=obstimes)
-
 
 KERNEL_PATHS = furnish_kernels()

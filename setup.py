@@ -32,7 +32,7 @@ setup_args = {
     "test_suite": "pytest",
     "tests_require": ["pytest"],
     "setup_requires": ["pytest-runner", "setuptools_scm"],
-    "install_requires": ["numpy>=1.15", "astropy>=6.0.0", "spiceypy", "jplephem"],
+    "install_requires": ["numpy>=1.15", "astropy>=6.0.0", "spiceypy", "jplephem", "filelock"],
     "classifiers": [
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
