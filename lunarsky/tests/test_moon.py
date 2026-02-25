@@ -112,6 +112,7 @@ def test_moonlocation_attribute():
 def test_moonlocation_copy():
     # Check that station_ids are copied properly
     loc0 = MoonLocation.from_selenodetic(lat=["-15d", "25d"], lon=["97d", "0d"])
+    loc0._set_station_id()
     lcop = loc0.copy()
     assert lcop.station_ids == loc0.station_ids
     lcop2 = copy.copy(loc0)
