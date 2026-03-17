@@ -1,230 +1,304 @@
 import numpy as np
 import os
-import tempfile
 from astropy.utils.data import download_files_in_parallel
 from astropy.coordinates.matrix_utilities import rotation_matrix
 from astropy.time import Time
 import astropy.units as unit
-
-import spiceypy as spice
 
 from .mcmf import MCMF
 from .data import DATA_PATH
 
 _J2000 = Time("J2000")
 
-TEMPORARY_KERNEL_DIR = tempfile.TemporaryDirectory()
+# ---------------------
+# Binary PCK reader
+# ---------------------
+
+_PCK_DATA = None
 
 
-def check_is_loaded(search):
+def _read_bpc(filepath):
     """
-    Search the kernel pool variable names for a given string.
+    Read a DAF-format binary PCK file (Type 2 Chebyshev).
+
+    Returns a dict with segment metadata and coefficient arrays.
     """
-    try:
-        spice.gnpool(search, 0, 100)
-    except (spice.support_types.SpiceyError):
-        return False
-    return True
+    from jplephem.daf import DAF
+
+    daf = DAF(open(filepath, "rb"))
+
+    segments = list(daf.summaries())
+    if len(segments) != 1:
+        raise ValueError(f"Expected 1 segment in binary PCK, got {len(segments)}")
+
+    name, values = segments[0]
+    data_type = int(values[4])
+    start_addr = int(values[5])
+    end_addr = int(values[6])
+
+    if data_type != 2:
+        raise ValueError(f"Unsupported binary PCK data type {data_type}")
+
+    arr = daf.read_array(start_addr, end_addr)
+
+    init_epoch = arr[-4]
+    interval = arr[-3]
+    rsize = int(arr[-2])
+    n_records = int(arr[-1])
+    n_coeffs = (rsize - 2) // 3
+
+    data = arr[: n_records * rsize].reshape(n_records, rsize)
+
+    return {
+        "init_epoch": init_epoch,
+        "interval": interval,
+        "n_coeffs": n_coeffs,
+        "n_records": n_records,
+        "data": data,
+    }
 
 
-def list_kernels():
+def _ensure_pck():
+    global _PCK_DATA
+    if _PCK_DATA is None:
+        _PCK_DATA = _read_bpc(
+            os.path.join(DATA_PATH, "pck", "moon_pa_de421_1900-2050.bpc")
+        )
+    return _PCK_DATA
+
+
+def _cheby_eval(coeffs, tau):
+    """Evaluate Chebyshev polynomial at tau in [-1, 1]. coeffs shape: (..., n_coeffs)."""
+    n = coeffs.shape[-1]
+    if n == 0:
+        return np.zeros(coeffs.shape[:-1])
+    T_prev = np.ones(coeffs.shape[:-1])
+    if n == 1:
+        return coeffs[..., 0] * T_prev
+    T_curr = tau
+    result = coeffs[..., 0] * T_prev + coeffs[..., 1] * T_curr
+    for i in range(2, n):
+        T_prev, T_curr = T_curr, 2 * tau * T_curr - T_prev
+        result = result + coeffs[..., i] * T_curr
+    return result
+
+
+def _R1(a):
+    c, s = np.cos(a), np.sin(a)
+    return np.array([[1, 0, 0], [0, c, s], [0, -s, c]])
+
+
+def _R2(a):
+    c, s = np.cos(a), np.sin(a)
+    return np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]])
+
+
+def _R3(a):
+    c, s = np.cos(a), np.sin(a)
+    return np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
+
+
+# PA to ME constant rotation from moon_080317.tf
+# TKFRAME_31007_ANGLES = (67.92, 78.56, 0.30) arcseconds, AXES = (3, 2, 1)
+# SPICE convention: R_PA_to_ME = R1(-a3) @ R2(-a2) @ R3(-a1)
+_a1 = np.radians(67.92 / 3600)
+_a2 = np.radians(78.56 / 3600)
+_a3 = np.radians(0.30 / 3600)
+_PA_TO_ME = _R1(-_a3) @ _R2(-_a2) @ _R3(-_a1)
+
+
+def j2000_to_moon_me(ets):
     """
-    List loaded kernels.
-
-    Returns
-    -------
-    list of str
-        Kernel names (file paths)
-    list of str
-        Corresponding kernel types
-    """
-    knames, ktypes = [], []
-    for typ in ["spk", "fk", "tk", "pck", "lsk"]:
-        for ii in range(spice.ktotal(typ)):
-            dat = spice.kdata(ii, typ)
-            knames.append(dat[0])
-            ktypes.append(dat[1])
-    return knames, ktypes
-
-
-def furnish_kernels():
-    kernel_names = [
-        "pck/moon_pa_de421_1900-2050.bpc",
-        "fk/satellites/moon_080317.tf",
-        "fk/satellites/moon_assoc_me.tf",
-    ]
-    kernel_paths = [os.path.join(DATA_PATH, kn) for kn in kernel_names]
-    for kp in kernel_paths:
-        spice.furnsh(kp)
-
-    # LSK and DE430 Kernels
-    knames = ["lsk/naif0012.tls", "spk/planets/de430.bsp"]
-    _naif_kernel_url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
-    kurls = [_naif_kernel_url + kname for kname in knames]
-    paths = download_files_in_parallel(kurls, cache=True, show_progress=False)
-    for kp in paths:
-        kernel_paths.append(kp)
-        spice.furnsh(kp)
-
-    return kernel_paths
-
-
-def lunar_surface_ephem(pos_x, pos_y, pos_z, station_num=98):
-    """
-    Make an SPK for the point on the lunar surface
-
-    Creates a temporary file and furnishes from that.
+    Compute J2000 -> MOON_ME rotation matrices.
 
     Parameters
     ----------
-    pos_x, pos_y, pos_z: float
-        MCMF frame cartesian position in km
-    station_num: int
-        Station number
+    ets : float or array_like
+        TDB seconds past J2000.
 
     Returns
     -------
-    int:
-        Ephemeris ID number
+    mats : ndarray, shape (..., 3, 3)
     """
-    point_id = 301000 + station_num
+    pck = _ensure_pck()
+    ets = np.atleast_1d(np.asarray(ets, dtype=float))
 
-    ets = np.array([spice.str2et("1950-01-01"), spice.str2et("2150-01-01")])
+    record_idx = ((ets - pck["init_epoch"]) / pck["interval"]).astype(int)
+    record_idx = np.clip(record_idx, 0, pck["n_records"] - 1)
 
-    states = np.zeros((len(ets), 6))
-    states[:, :3] = np.repeat([[pos_x], [pos_y], [pos_z]], len(ets), axis=1).T
+    records = pck["data"][record_idx]
+    mid = records[:, 0]
+    half = records[:, 1]
+    nc = pck["n_coeffs"]
 
-    center = 301
-    frame = "MOON_ME"
-    degree = 1
+    tau = (ets - mid) / half
 
-    fname = os.path.join(TEMPORARY_KERNEL_DIR.name, "lunar_points.bsp")
-    if os.path.exists(fname):
-        spice.unload(fname)
-        handle = spice.spkopa(fname)
+    ra_coeffs = records[:, 2 : 2 + nc]
+    dec_coeffs = records[:, 2 + nc : 2 + 2 * nc]
+    w_coeffs = records[:, 2 + 2 * nc : 2 + 3 * nc]
+
+    ra = _cheby_eval(ra_coeffs, tau)
+    dec = _cheby_eval(dec_coeffs, tau)
+    w = _cheby_eval(w_coeffs, tau)
+
+    # J2000 -> MOON_PA: R3(W) @ R1(Dec) @ R3(RA)
+    # Then apply PA -> ME constant rotation
+    mats = np.zeros((len(ets), 3, 3))
+    for i in range(len(ets)):
+        j2000_to_pa = _R3(w[i]) @ _R1(dec[i]) @ _R3(ra[i])
+        mats[i] = _PA_TO_ME @ j2000_to_pa
+
+    return mats
+
+
+def moon_me_to_j2000(ets):
+    """Transpose of j2000_to_moon_me."""
+    return np.swapaxes(j2000_to_moon_me(ets), -2, -1)
+
+
+# ---------------------
+# Ephemeris (jplephem)
+# ---------------------
+
+_SPK = None
+
+
+def _ensure_spk():
+    global _SPK
+    if _SPK is None:
+        from jplephem.spk import SPK
+
+        spk_name = "spk/planets/de430.bsp"
+        _naif_kernel_url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
+        kurl = [_naif_kernel_url + spk_name]
+        paths = download_files_in_parallel(kurl, cache=True, show_progress=False)
+        _SPK = SPK.open(paths[0])
+    return _SPK
+
+
+def _et_to_jd(ets):
+    """Convert ET (TDB seconds past J2000) to Julian date."""
+    return np.asarray(ets) / 86400.0 + 2451545.0
+
+
+def _pos_ssb_j2000(body_id, ets):
+    """
+    Get position of a solar system body relative to SSB in J2000.
+
+    Parameters
+    ----------
+    body_id : int
+        0=SSB, 301=Moon, 399=Earth
+    ets : ndarray
+        ET values
+
+    Returns
+    -------
+    pos : ndarray, shape (N, 3)
+        Position in km.
+    """
+    if body_id == 0:
+        return np.zeros((len(ets), 3))
+
+    spk = _ensure_spk()
+    jd = _et_to_jd(ets)
+
+    if body_id == 301:
+        emb = np.asarray(spk[0, 3].compute(jd)).T
+        moon_emb = np.asarray(spk[3, 301].compute(jd)).T
+        return emb + moon_emb
+    elif body_id == 399:
+        emb = np.asarray(spk[0, 3].compute(jd)).T
+        earth_emb = np.asarray(spk[3, 399].compute(jd)).T
+        return emb + earth_emb
     else:
-        handle = spice.spkopn(fname, "SPK_FILE", 0)
-    spice.spkw09(
-        handle,
-        point_id,
-        center,
-        frame,
-        ets[0],
-        ets[-1],
-        "0",
-        degree,
-        len(ets),
-        states.tolist(),
-        ets.tolist(),
-    )
-    spice.spkcls(handle)
-    spice.furnsh(fname)
-
-    return point_id
+        raise ValueError(f"Unsupported body ID {body_id}")
 
 
-def topo_frame_def(latitude, longitude, station_num=98, moon=True):
+def body_position(target_id, ets, frame, observer_id):
     """
-    Make a list of strings defining a topocentric frame. This can then be loaded
-    with spiceypy.lmpool.
+    Get position of target relative to observer in given frame.
+
+    Parameters
+    ----------
+    target_id : int
+        NAIF body ID of target (0=SSB, 301=Moon, 399=Earth)
+    ets : array_like
+        ET values (TDB seconds past J2000)
+    frame : str
+        "J2000" or "MOON_ME"
+    observer_id : int
+        NAIF body ID of observer
+
+    Returns
+    -------
+    pos : ndarray, shape (N, 3)
+        Position in km.
     """
-    if moon:
-        idnum = 1301000
-        station_name = f"LUNAR-TOPO-{station_num}"
-        relative = "MOON_ME"
+    ets = np.atleast_1d(np.asarray(ets, dtype=float))
+
+    pos_j2000 = _pos_ssb_j2000(target_id, ets) - _pos_ssb_j2000(observer_id, ets)
+
+    if frame == "J2000":
+        return pos_j2000
+    elif frame == "MOON_ME":
+        mats = j2000_to_moon_me(ets)
+        return np.einsum("nij,nj->ni", mats, pos_j2000)
     else:
-        # Used in tests only
-        idnum = 1399000
-        station_name = f"EARTH-TOPO-{station_num}"
-        relative = "ITRF93"
+        raise ValueError(f"Unsupported frame {frame}")
 
-    # The DSS stations are built into SPICE, and they number up to 66.
-    # We will call this station number 98.
-    idnum += station_num
-    fm_center_id = idnum - 1000000
 
+def station_pos_ssb_j2000(pos_me_km, ets):
+    """
+    Get position of a lunar surface station relative to SSB in J2000.
+
+    Parameters
+    ----------
+    pos_me_km : ndarray, shape (3,)
+        Station position in MOON_ME frame, in km.
+    ets : ndarray
+        ET values.
+
+    Returns
+    -------
+    pos : ndarray, shape (N, 3)
+        Position in km.
+    """
+    ets = np.atleast_1d(np.asarray(ets, dtype=float))
+    moon_ssb = _pos_ssb_j2000(301, ets)
+    me_to_j2000 = moon_me_to_j2000(ets)
+    station_j2000 = np.einsum("nij,j->ni", me_to_j2000, pos_me_km)
+    return moon_ssb + station_j2000
+
+
+def topo_rotation_matrix(lat_deg, lon_deg):
+    """
+    Compute the MOON_ME -> topocentric (E/N/U) rotation matrix for a surface location.
+
+    Parameters
+    ----------
+    lat_deg, lon_deg : float
+        Selenodetic latitude and longitude in degrees.
+
+    Returns
+    -------
+    matrix : ndarray, shape (3, 3)
+    """
     ecef_to_enu = np.matmul(
-        rotation_matrix(-longitude, "z", unit="deg"),
-        rotation_matrix(latitude, "y", unit="deg"),
+        rotation_matrix(-lon_deg, "z", unit="deg"),
+        rotation_matrix(lat_deg, "y", unit="deg"),
     ).T
-    # Reorder the axes so that X,Y,Z = E,N,U
     ecef_to_enu = ecef_to_enu[[2, 1, 0]]
-
-    mat = " ".join(map("{:.7f}".format, ecef_to_enu.flatten()))
-
-    fmt_strs = [
-        "FRAME_{1}                     = {0}",
-        "FRAME_{0}_NAME                = '{1}'",
-        "FRAME_{0}_CLASS               = 4",
-        "FRAME_{0}_CLASS_ID            = {0}",
-        "FRAME_{0}_CENTER              = {2}",
-        "OBJECT_{2}_FRAME              = '{1}'",
-        "TKFRAME_{0}_RELATIVE          = '{3}'",
-        "TKFRAME_{0}_SPEC              = 'MATRIX'",
-        "TKFRAME_{0}_MATRIX            = {4}",
-    ]
-
-    frame_specs = [
-        s.format(idnum, station_name, fm_center_id, relative, mat) for s in fmt_strs
-    ]
-
-    frame_dict = {}
-
-    for spec in frame_specs:
-        k, v = map(str.strip, spec.split("="))
-        frame_dict[k] = v
-
-    latlon = ["{:.4f}".format(coord) for coord in [latitude, longitude]]
-
-    return station_name, idnum, frame_dict, latlon
-
-
-def remove_topo(station_num):
-    """Remove a lunar station, by number, from variable pool."""
-
-    idnum = 1301000 + station_num
-    fm_center_id = idnum - 1000000
-    station_name = f"LUNAR-TOPO-{station_num}"
-
-    fmt_vars = [
-        "FRAME_{1}",
-        "FRAME_{0}_NAME",
-        "FRAME_{0}_CLASS",
-        "FRAME_{0}_CLASS_ID",
-        "FRAME_{0}_CENTER",
-        "OBJECT_{2}_FRAME",
-        "TKFRAME_{0}_RELATIVE",
-        "TKFRAME_{0}_SPEC",
-        "TKFRAME_{0}_MATRIX",
-    ]
-
-    frame_vars = [s.format(idnum, station_name, fm_center_id) for s in fmt_vars]
-
-    # Handle a bug in spiceypy for older versions of numpy
-    if np.str_ is None:
-        return
-    for var in frame_vars:
-        spice.dvpool(var)
-
-    # Ideally, one would also remove the ephemeris data for this station from
-    # the lunar_points.bsp file. This doesn't seem to be possible. However,
-    # the ephemeris _should_ be overwritten if the station_id is reused.
+    return np.asarray(ecef_to_enu)
 
 
 def earth_pos_mcmf(obstimes):
     """
     Get the position of the Earth in the MCMF frame.
 
-    Using SPICE.
-
     Used for tests.
     """
     ets = (obstimes - Time("J2000")).sec
-    earthpos = np.stack(
-        [spice.spkpos("399", et, "MOON_ME", "None", "301")[0] for et in ets]
-    )
+    earthpos = body_position(399, ets, "MOON_ME", 301)
     earthpos = unit.Quantity(earthpos.T, "km")
     return MCMF(*earthpos, obstime=obstimes)
-
-
-KERNEL_PATHS = furnish_kernels()

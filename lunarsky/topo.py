@@ -22,9 +22,13 @@ from astropy.coordinates.builtin_frames.icrs import ICRS
 
 from .mcmf import MCMF
 from .moon import MoonLocationAttribute
-from .spice_utils import check_is_loaded, topo_frame_def, lunar_surface_ephem
-
-import spiceypy as spice
+from .spice_utils import (
+    j2000_to_moon_me,
+    moon_me_to_j2000,
+    body_position,
+    station_pos_ssb_j2000,
+    topo_rotation_matrix,
+)
 
 _90DEG = 90 * un.deg
 __all__ = ["LunarTopo"]
@@ -88,22 +92,26 @@ class LunarTopo(BaseCoordinateFrame):
 # -----------------
 
 
-def _spice_setup(locations, station_ids):
-    for li, loc in enumerate(np.atleast_1d(locations)):
-        sid = int(station_ids[li])
-        frameloaded = check_is_loaded(f"FRAME_LUNAR-TOPO-{sid}")
-        if not frameloaded:
-            lunar_surface_ephem(
-                loc.x.to_value("km"),
-                loc.y.to_value("km"),
-                loc.z.to_value("km"),
-                station_num=sid,
-            )  # Furnishes SPK for lunar surface point
-            station_name, idnum, frame_specs, latlon = topo_frame_def(
-                loc.lat.deg, loc.lon.deg, moon=True, station_num=sid
-            )
-            frame_strs = ["{}={}".format(k, v) for (k, v) in frame_specs.items()]
-            spice.lmpool(frame_strs)
+def _get_topo_data(location):
+    """
+    Compute topo rotation matrices and MOON_ME positions for each location element.
+
+    Returns
+    -------
+    topo_mats : ndarray, shape (M, 3, 3)
+        ME-to-topo rotation matrices.
+    pos_mes : ndarray, shape (M, 3)
+        Station positions in MOON_ME, in km.
+    """
+    locations = np.atleast_1d(location)
+    topo_mats = []
+    pos_mes = []
+    for loc in locations:
+        topo_mats.append(topo_rotation_matrix(loc.lat.deg, loc.lon.deg))
+        pos_mes.append(
+            [loc.x.to_value("km"), loc.y.to_value("km"), loc.z.to_value("km")]
+        )
+    return np.array(topo_mats), np.array(pos_mes)
 
 
 def make_transform(coo, toframe):
@@ -123,29 +131,28 @@ def make_transform(coo, toframe):
     if location is None:
         raise ValueError("location must be defined for LunarTopo transformations")
 
-    # Initialize station_ids if not defined.
-    if location.station_ids == []:
-        location.__class__._set_site_id(location)
-
     # Make arrays
     ets = (obstime - _J2000).sec
-    stat_ids = np.asarray(location.station_ids)
+    topo_mats, pos_mes = _get_topo_data(location)
+    loc_indices = np.arange(len(topo_mats))
     shape_out = np.broadcast_shapes(coo.shape, ets.shape, location.shape)
 
-    # Set up SPICE ephemerides and frame details
-    _spice_setup(location, stat_ids)
-
-    ets_ids = np.atleast_2d(np.stack(np.broadcast_arrays(ets, stat_ids)).T)
+    ets_locs = np.atleast_2d(np.stack(np.broadcast_arrays(ets, loc_indices)).T)
 
     coo_cart = coo.cartesian
 
     # Make rotation matrices
-    mats = np.asarray(
-        [
-            spice.pxform(f"LUNAR-TOPO-{int(stat_id)}", frame_spice_name, et)
-            for (et, stat_id) in ets_ids
-        ]
-    )
+    # TOPO->ME is topo_matrix.T (constant); TOPO->J2000 = R(ME->J2000) @ topo_matrix.T
+    mats_list = []
+    for et, loc_idx in ets_locs:
+        loc_idx = int(loc_idx)
+        topo_mat = topo_mats[loc_idx]
+        if frame_spice_name == "MOON_ME":
+            mats_list.append(topo_mat.T)
+        else:
+            me_to_j2000 = moon_me_to_j2000(np.array([et]))[0]
+            mats_list.append(me_to_j2000 @ topo_mat.T)
+    mats = np.asarray(mats_list)
     if totopo:
         mats = np.linalg.inv(mats)
 
@@ -157,29 +164,35 @@ def make_transform(coo, toframe):
 
     # If not unitspherical, shift by origin vector before rotating.
     if not is_unitspherical:
-        # Make origin vector(s) in coo's frame.
-        if totopo:
-            origin_id = lambda n: int(frame_id)  # MCMF or ICRS frame origin
-            target_id = lambda n: int(n) + 301000  # Station ID
-            frame_name = lambda n: frame_spice_name
+        orig_pos_list = []
+        for et, loc_idx in ets_locs:
+            loc_idx = int(loc_idx)
+            pos_me = pos_mes[loc_idx]
+            topo_mat = topo_mats[loc_idx]
+            et_arr = np.array([et])
 
-        else:
-            origin_id = lambda n: int(n) + 301000
-            target_id = lambda n: int(frame_id)
-            frame_name = lambda n: f"LUNAR-TOPO-{int(n)}"
+            if totopo:
+                # Origin = station position relative to frame origin, in coo's frame
+                if frame_id == 0:  # SSB / ICRS
+                    orig_pos_list.append(
+                        station_pos_ssb_j2000(pos_me, et_arr)[0]
+                    )
+                else:  # Moon center / MCMF
+                    orig_pos_list.append(pos_me)
+            else:
+                # Origin = frame origin relative to station, in coo's frame (topo)
+                if frame_id == 0:  # SSB
+                    station_ssb = station_pos_ssb_j2000(pos_me, et_arr)[0]
+                    ssb_station_j2000 = -station_ssb
+                    # Rotate to topo
+                    j2000_me = j2000_to_moon_me(et_arr)[0]
+                    ssb_station_me = j2000_me @ ssb_station_j2000
+                    orig_pos_list.append(topo_mat @ ssb_station_me)
+                else:  # Moon center
+                    orig_pos_list.append(-(topo_mat @ pos_me))
 
-        orig_posvel = (
-            np.asarray(
-                [
-                    spice.spkgeo(
-                        target_id(stat_id), et, frame_name(stat_id), origin_id(stat_id)
-                    )[0]
-                    for (et, stat_id) in ets_ids
-                ]
-            )
-            * un.km
-        )
-        coo_cart -= CartesianRepresentation((orig_posvel.T)[:3])
+        orig_pos = np.asarray(orig_pos_list) * un.km
+        coo_cart -= CartesianRepresentation(orig_pos.T)
 
     newrepr = coo_cart.transform(mats).reshape(shape_out)
 

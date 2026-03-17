@@ -1,120 +1,73 @@
-from astropy.coordinates.baseframe import frame_transform_graph
-from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
-from astropy.coordinates import AltAz, ICRS, EarthLocation, Angle
-from astropy.utils.data import download_files_in_parallel
-import lunarsky
+import numpy as np
+import os
+import pytest
 import lunarsky.spice_utils as spice_utils
-from lunarsky.time import Time
 
 
-import spiceypy as spice
+FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "data", "spice_fixtures.npz")
 
 
-def test_topo_frame_setup():
-    # Check that the frame setup puts all the correct values in the kernel pool.
-
-    latitude, longitude = 30, 25
-    name, idnum, frame_dict, latlon = spice_utils.topo_frame_def(latitude, longitude)
-    frame_strs = ["{}={}".format(k, v) for (k, v) in frame_dict.items()]
-    spice.lmpool(frame_strs)
-
-    for k, v in frame_dict.items():
-        N, typecode = spice.dtpool(k)
-        if typecode == "N":
-            res = spice.gdpool(k, 0, 100)
-            if len(res) == 1:
-                res = [int(res[0])]
-            if N > 1:
-                v = [float(it) for it in v.split(" ")]
-                res = res.tolist()
-            else:
-                res = res[0]
-                v = int(v)
-            assert v == res
-        else:
-            res = spice.gcpool(k, 0, 100)[0]
-            v = v.replace("'", "")
-            assert v == res
+@pytest.fixture
+def fixtures():
+    return np.load(FIXTURE_PATH)
 
 
-def test_kernel_paths():
-    # Check that the correct kernel files are downloaded
-    # Need to unhash the file names
+def test_j2000_to_moon_me(fixtures):
+    ets = fixtures["ets"]
+    expected = fixtures["j2000_to_me"]
+    computed = spice_utils.j2000_to_moon_me(ets)
+    np.testing.assert_allclose(computed, expected, atol=1e-10)
 
-    assert len(lunarsky.spice_utils.KERNEL_PATHS) == 5
+
+def test_body_position_moon_earth(fixtures):
+    ets = fixtures["ets"]
+    expected = fixtures["moon_earth_j2000"][:, :3]
+    computed = spice_utils.body_position(301, ets, "J2000", 399)
+    np.testing.assert_allclose(computed, expected, atol=1e-6)
 
 
-def test_spice_earth(grcat):
-    # Replace the ICRS->AltAz transform in astropy with one using SPICE.
-    # Confirm that star positions are the same as with the original transform
-    # to within the error due to relativistic aberration (~ 21 arcsec)
+def test_body_position_moon_ssb(fixtures):
+    ets = fixtures["ets"]
+    expected = fixtures["moon_ssb_j2000"][:, :3]
+    computed = spice_utils.body_position(301, ets, "J2000", 0)
+    np.testing.assert_allclose(computed, expected, atol=1e-6)
 
-    # DSS-15, 399015
-    lat, lon, height = 35.42185, -116.8871951, 973.211
 
-    loc = EarthLocation.from_geodetic(lon, lat, height)
-    t0 = Time.now()
-    _J2000 = Time("J2000")
+def test_body_position_ssb_moon_me(fixtures):
+    ets = fixtures["ets"]
+    expected = fixtures["ssb_moon_me"][:, :3]
+    computed = spice_utils.body_position(0, ets, "MOON_ME", 301)
+    np.testing.assert_allclose(computed, expected, atol=1e-4)
 
-    altaz = grcat.transform_to(AltAz(location=loc, obstime=t0))
 
-    # Make the Earth topo frame in spice.
-    framename, idnum, frame_dict, latlon = lunarsky.spice_utils.topo_frame_def(
-        lat, lon, moon=False
+def test_earth_pos_mcmf(fixtures):
+    ets = fixtures["ets"]
+    expected = fixtures["earth_me"]
+    computed = spice_utils.body_position(399, ets, "MOON_ME", 301)
+    np.testing.assert_allclose(computed, expected, atol=1e-4)
+
+
+def test_topo_rotation_matrix(fixtures):
+    expected = fixtures["topo_to_me"]
+    topo_matrix = spice_utils.topo_rotation_matrix(
+        float(fixtures["topo_station_lat_deg"]),
+        float(fixtures["topo_station_lon_deg"]),
     )
+    # TOPO -> MOON_ME should be topo_matrix.T (constant)
+    for i in range(len(expected)):
+        np.testing.assert_allclose(topo_matrix.T, expected[i], atol=1e-7)
 
-    # One more kernel is needed for the ITRF93 frame.
-    kname = "pck/earth_latest_high_prec.bpc"
-    _naif_kernel_url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels"
-    kurl = [_naif_kernel_url + "/" + kname]
-    kernpath = download_files_in_parallel(
-        kurl,
-        cache=True,
-        show_progress=False,
+    # Verify full precision matrix is orthogonal
+    np.testing.assert_allclose(topo_matrix @ topo_matrix.T, np.eye(3), atol=1e-14)
+
+
+def test_topo_to_j2000(fixtures):
+    ets = fixtures["ets"]
+    expected_to_j2000 = fixtures["topo_to_j2000"]
+    topo_matrix = spice_utils.topo_rotation_matrix(
+        float(fixtures["topo_station_lat_deg"]),
+        float(fixtures["topo_station_lon_deg"]),
     )
-    spice.furnsh(kernpath)
-
-    frame_strs = ["{}={}".format(k, v) for (k, v) in frame_dict.items()]
-    spice.lmpool(frame_strs)
-    et = (t0 - _J2000).sec
-
-    @frame_transform_graph.transform(FunctionTransformWithFiniteDifference, ICRS, AltAz)
-    def icrs_to_ecef(icrs_coo, ecef_frame):
-        mat = spice.pxform("J2000", framename, et)
-        newrepr = icrs_coo.cartesian.transform(mat)
-
-        return ecef_frame.realize_frame(newrepr)
-
-    tr = frame_transform_graph.get_transform(ICRS, AltAz).transforms
-    assert tr[0].func.__name__ == "icrs_to_ecef"  # Confirm new transform added correctly
-
-    altaz2 = grcat.transform_to(AltAz(location=loc, obstime=t0))
-
-    # Having done the transform, remove the spice transform from the graph
-    frame_transform_graph.remove_transform(ICRS, AltAz, None)
-
-    # Compare astropy topocentric coordinate transform results to
-    assert all(altaz.separation(altaz2) < Angle("25arcsec"))
-    # NOTE Large deviations in azimuth high altitudes.
-
-
-def test_topo_kernel_setup():
-    # Tests a single function in topo.py
-    # Need to clear the kernel pool first
-
-    spice.clpool()
-    # Confirm no variables are loaded.
-    assert not lunarsky.spice_utils.check_is_loaded("*")
-
-    for filepath in lunarsky.spice_utils.KERNEL_PATHS:
-        spice.furnsh(filepath)
-    loc = lunarsky.MoonLocation.from_selenodetic(lat="30d", lon="20d")
-    station_name, idnum, frame_specs, latlon = lunarsky.spice_utils.topo_frame_def(
-        loc.lat.deg, loc.lon.deg, moon=True
-    )
-    statnum = idnum - 1301000
-    lunarsky.topo._spice_setup(loc, [statnum])
-    try:
-        assert lunarsky.spice_utils.check_is_loaded("*{}*".format(idnum))
-    finally:
-        lunarsky.spice_utils.remove_topo(statnum)
+    me_to_j2000 = spice_utils.moon_me_to_j2000(ets)
+    computed_to_j2000 = np.einsum("nij,jk->nik", me_to_j2000, topo_matrix.T)
+    np.testing.assert_allclose(computed_to_j2000, expected_to_j2000, atol=1e-10)
