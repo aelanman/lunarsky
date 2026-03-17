@@ -25,7 +25,6 @@ from .moon import MoonLocationAttribute
 from .spice_utils import (
     j2000_to_moon_me,
     moon_me_to_j2000,
-    body_position,
     station_pos_ssb_j2000,
     topo_rotation_matrix,
 )
@@ -108,9 +107,7 @@ def _get_topo_data(location):
     pos_mes = []
     for loc in locations:
         topo_mats.append(topo_rotation_matrix(loc.lat.deg, loc.lon.deg))
-        pos_mes.append(
-            [loc.x.to_value("km"), loc.y.to_value("km"), loc.z.to_value("km")]
-        )
+        pos_mes.append([loc.x.to_value("km"), loc.y.to_value("km"), loc.z.to_value("km")])
     return np.array(topo_mats), np.array(pos_mes)
 
 
@@ -174,9 +171,7 @@ def make_transform(coo, toframe):
             if totopo:
                 # Origin = station position relative to frame origin, in coo's frame
                 if frame_id == 0:  # SSB / ICRS
-                    orig_pos_list.append(
-                        station_pos_ssb_j2000(pos_me, et_arr)[0]
-                    )
+                    orig_pos_list.append(station_pos_ssb_j2000(pos_me, et_arr)[0])
                 else:  # Moon center / MCMF
                     orig_pos_list.append(pos_me)
             else:

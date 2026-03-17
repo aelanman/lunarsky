@@ -7,7 +7,6 @@ from astropy.coordinates import (
 )
 from astropy.tests.helper import quantity_allclose
 from lunarsky import MoonLocation, MoonLocationAttribute, MCMF
-from lunarsky.moon import SELENOIDS
 
 
 class TestsWithObject:
