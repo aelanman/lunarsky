@@ -4,8 +4,9 @@ import pytest
 import lunarsky.spice_utils as spice_utils
 
 
-# spice_fixtures.npz contains saved results of the earlier version of lunarsky that was based on the SPICE toolkit
-# Tests here are meant to verify that the new code is consistent with older results.
+# spice_fixtures.npz contains saved results of the earlier version of lunarsky that was based
+# on the SPICE toolkit. Tests here are meant to verify that the new code is consistent with
+# older results.
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "data", "spice_fixtures.npz")
 
 

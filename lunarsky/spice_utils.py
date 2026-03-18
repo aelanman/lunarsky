@@ -98,7 +98,8 @@ def _R3(a):
     return np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
 
 
-# PA to ME constant rotation from moon_080317.tf
+# PA to ME constant rotation from moon_080317.tf (FRAME_31007 = MOON_ME_DE421).
+# These angles are specific to DE421; they will differ for other ephemerides.
 # TKFRAME_31007_ANGLES = (67.92, 78.56, 0.30) arcseconds, AXES = (3, 2, 1)
 # SPICE convention: R_PA_to_ME = R1(-a3) @ R2(-a2) @ R3(-a1)
 _a1 = np.radians(67.92 / 3600)

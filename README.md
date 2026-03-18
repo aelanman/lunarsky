@@ -9,15 +9,13 @@ An extension to `astropy`, providing selenocentric and topocentric reference fra
 for the Moon and transformations of star positions from the ICRS system to these
 frames. This is to describe the sky as observed from the surface of the Moon.
 
-Non-relativistic transformations are calculated using the SPICE toolkit. Relativistic
-corrections (stellar aberration) will be added.
+Non-relativistic transformations are calculated using lunar orientation data from JPL SPICE kernel files, read with `jplephem`.
 
 
 ## Dependencies
 * `numpy`
-* `astropy>=3.0`
+* `astropy>=6.0.0`
 * `jplephem`
-* `spiceypy`
 
 ## Installation
 
@@ -53,7 +51,7 @@ The cartesian axes of the selenocentric system are those of the MCMF frame. Sele
 
 ## Credit
 
-This package makes use of the ``spiceypy`` wrapper [2] for the JPL SPICE Toolkit, produced by the NASA Navigation and Ancillary Information Facility (NAIF) [3] [4]. The transformations are defined using data in kernel files ``pck/moon_pa_de421_1900-2050.bpc``, ``moon_080317.tf``, and ``moon_assoc_me.tf``. These may be found at [the NAIF website](https://naif.jpl.nasa.gov/pub/naif/generic_kernels), and were produced by Nat Bachman (NAIF/JPL) in March 2008. Further information may be found in the comments in these files in the `data` directory.
+This package uses lunar orientation data from SPICE kernel files produced by the NASA Navigation and Ancillary Information Facility (NAIF) [3] [4]. The transformations are defined using data in kernel files ``pck/moon_pa_de421_1900-2050.bpc``, ``moon_080317.tf``, and ``moon_assoc_me.tf``. These may be found at [the NAIF website](https://naif.jpl.nasa.gov/pub/naif/generic_kernels), and were produced by Nat Bachman (NAIF/JPL) in March 2008. Binary kernel files are read using ``jplephem`` [5]. Further information may be found in the comments in the kernel files in the `data` directory.
 
 ## References
 [1]: Ye, Hanlin, et al. "Looking Vector Direction Analysis for the Moon-Based Earth Observation Optical Sensor." IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing, vol. 11, no. 11, Nov. 2018, pp. 4488–99. IEEE Xplore, doi:10.1109/JSTARS.2018.2870247.
@@ -63,3 +61,5 @@ This package makes use of the ``spiceypy`` wrapper [2] for the JPL SPICE Toolkit
 [3]: Acton, C.H.; "Ancillary Data Services of NASA's Navigation and Ancillary Information Facility;" Planetary and Space Science, Vol. 44, No. 1, pp. 65-70, 1996.
 
 [4]: Charles Acton, Nathaniel Bachman, Boris Semenov, Edward Wright; A look toward the future in the handling of space science mission geometry; Planetary and Space Science (2017); DOI 10.1016/j.pss.2017.02.013; https://doi.org/10.1016/j.pss.2017.02.013
+
+[5]: Rhodes, Brandon. jplephem: Python module for evaluating JPL ephemerides. https://github.com/brandon-rhodes/python-jplephem
