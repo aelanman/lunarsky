@@ -70,7 +70,7 @@ class Time(astropy.time.Time):
         # to the selenodetic coordinate system. "self.location" must
         # be defined in order to get here.
 
-        et = np.atleast_1d((self - Time("J2000")).sec)
+        et = np.atleast_1d((self.tdb - Time("J2000")).sec)
         mats = moon_me_to_j2000(et)
 
         # Zenith vector

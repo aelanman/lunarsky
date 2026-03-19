@@ -205,7 +205,7 @@ def _pos_ssb_j2000(body_id, ets):
     jd = _et_to_jd(ets)
 
     if body_id == 301:
-        emb = np.asarray(spk[0, 3].compute(jd)).T
+        emb = np.asarray(spk[0, 3].compute(jd)).T           # spk keys are tuples (center, target)
         moon_emb = np.asarray(spk[3, 301].compute(jd)).T
         return emb + moon_emb
     elif body_id == 399:
@@ -299,7 +299,7 @@ def earth_pos_mcmf(obstimes):
 
     Used for tests.
     """
-    ets = (obstimes - Time("J2000")).sec
+    ets = (obstimes.tdb - Time("J2000")).sec
     earthpos = body_position(399, ets, "MOON_ME", 301)
     earthpos = unit.Quantity(earthpos.T, "km")
     return MCMF(*earthpos, obstime=obstimes)

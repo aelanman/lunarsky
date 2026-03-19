@@ -66,7 +66,7 @@ def make_transform(coo, toframe):
     obstime = toframe.obstime if to_mcmf else coo.obstime
 
     # Make arrays
-    ets = np.atleast_1d((obstime - _J2000).sec)
+    ets = np.atleast_1d((obstime.tdb - _J2000).sec)
     shape_out = np.broadcast_shapes(coo.shape, ets.shape)
 
     coo_cart = coo.cartesian

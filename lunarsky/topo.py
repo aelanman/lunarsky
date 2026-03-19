@@ -129,7 +129,7 @@ def make_transform(coo, toframe):
         raise ValueError("location must be defined for LunarTopo transformations")
 
     # Make arrays
-    ets = (obstime - _J2000).sec
+    ets = (obstime.tdb - _J2000).sec
     topo_mats, pos_mes = _get_topo_data(location)
     loc_indices = np.arange(len(topo_mats))
     shape_out = np.broadcast_shapes(coo.shape, ets.shape, location.shape)
