@@ -205,7 +205,7 @@ def _pos_ssb_j2000(body_id, ets):
     jd = _et_to_jd(ets)
 
     if body_id == 301:
-        emb = np.asarray(spk[0, 3].compute(jd)).T           # spk keys are tuples (center, target)
+        emb = np.asarray(spk[0, 3].compute(jd)).T  # spk keys are tuples (center, target)
         moon_emb = np.asarray(spk[3, 301].compute(jd)).T
         return emb + moon_emb
     elif body_id == 399:
