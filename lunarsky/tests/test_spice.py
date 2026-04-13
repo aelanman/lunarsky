@@ -2,6 +2,7 @@ import numpy as np
 import os
 import pytest
 import lunarsky.spice_utils as spice_utils
+from lunarsky.data import DATA_PATH
 
 
 # spice_fixtures.npz contains saved results of the earlier version of lunarsky that was based
@@ -13,6 +14,20 @@ FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "data", "spice_fixtures.n
 @pytest.fixture
 def fixtures():
     return np.load(FIXTURE_PATH)
+
+
+def test_kernels_available():
+    """
+    Ensure the large SPK kernel is available, downloading it if not.
+
+    This is a no-op when the kernel is already present (e.g. via CI cache or
+    a prior download), so it won't hit the JPL server unnecessarily. It does
+    double duty as a smoke test of download_big_kernels() on fresh environments.
+    """
+    spk_path = os.path.join(DATA_PATH, "spk", "planets", "de430.bsp")
+    if not os.path.exists(spk_path):
+        spice_utils.download_big_kernels()
+    assert os.path.exists(spk_path)
 
 
 def test_j2000_to_moon_me(fixtures):

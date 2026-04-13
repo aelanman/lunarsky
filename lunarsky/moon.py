@@ -373,7 +373,7 @@ class MoonLocation(u.Quantity):
 
     @property
     def lat(self):
-        """Longitude of the location"""
+        """Latitude of the location"""
         return self.selenodetic[1]
 
     @property
@@ -415,7 +415,7 @@ class MoonLocation(u.Quantity):
     mcmf = property(
         get_mcmf,
         doc="""An `~astropy.coordinates.MCMF` object  with
-                                     for the location of this object at the
+                                     or the location of this object at the
                                      default ``obstime``.""",
     )
 

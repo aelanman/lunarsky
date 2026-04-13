@@ -1,6 +1,9 @@
 import numpy as np
 import os
-from astropy.utils.data import download_files_in_parallel
+import urllib.request
+import warnings
+from filelock import FileLock
+from astropy.utils.console import ProgressBar
 from astropy.coordinates.matrix_utilities import rotation_matrix
 from astropy.time import Time
 import astropy.units as unit
@@ -162,6 +165,40 @@ def moon_me_to_j2000(ets):
 # ---------------------
 
 _SPK = None
+_BIG_KERNELS = ["spk/planets/de430.bsp"]
+_NAIF_KERNEL_URL = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
+
+
+def download_big_kernels():
+    """
+    Download large (~150 MB) SPICE kernel files that can't be
+    included in the python package.
+
+    Installs them to the package data directory. Must be run once
+    before using lunarsky transformations that depend on these kernels.
+    """
+    paths = []
+    for kern in _BIG_KERNELS:
+        kf = os.path.join(DATA_PATH, kern)
+        paths.append(kf)
+        if os.path.exists(kf):
+            continue
+        kurl = _NAIF_KERNEL_URL + kern
+        os.makedirs(os.path.dirname(kf), exist_ok=True)
+        with urllib.request.urlopen(kurl) as response:
+            total_size = int(response.headers.get("Content-Length", 0))
+            chunk_size = max(4096, total_size // 20) if total_size > 0 else 4096
+            downloaded = 0
+            with ProgressBar(
+                total_size // chunk_size + 1, ipython_widget=False
+            ) as pbar, open(kf, "wb") as ofile, FileLock(kf + ".lock"):
+                while cur_buf := response.read(chunk_size):
+                    downloaded += len(cur_buf)
+                    if total_size > 0:
+                        pbar.update(downloaded // chunk_size)
+                    ofile.write(cur_buf)
+
+    return paths
 
 
 def _ensure_spk():
@@ -169,11 +206,14 @@ def _ensure_spk():
     if _SPK is None:
         from jplephem.spk import SPK
 
-        spk_name = "spk/planets/de430.bsp"
-        _naif_kernel_url = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/"
-        kurl = [_naif_kernel_url + spk_name]
-        paths = download_files_in_parallel(kurl, cache=True, show_progress=False)
-        _SPK = SPK.open(paths[0])
+        spk_path = os.path.join(DATA_PATH, "spk/planets/de430.bsp")
+        if not os.path.exists(spk_path):
+            raise FileNotFoundError(
+                f"Required kernel file not found: {spk_path}. "
+                "Please run lunarsky.spice_utils.download_big_kernels() "
+                "to download it."
+            )
+        _SPK = SPK.open(spk_path)
     return _SPK
 
 

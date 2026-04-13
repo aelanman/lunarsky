@@ -136,3 +136,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Downloaded SPICE kernels (fetched by download_big_kernels / CI cache)
+lunarsky/data/spk/planets/de430.bsp
+lunarsky/data/**/*.lock

@@ -27,8 +27,12 @@ jobs:
           pre-commit install
           pre-commit run -a
   datacache:
-    name: Cache Data
-    runs-on: ubuntu-latest
+    name: Cache Data (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -37,19 +41,17 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.9
-      - name: Get current date
-        id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
       - name: cache-kernels
+        id: cache-kernels
         uses: actions/cache@v3
         with:
-          path: ~/ap_cache
-          key: kernel_cache-${{ steps.date.outputs.date }}
-      - name: Download and cache
-        run: |
-          pip install astropy
-          python ./ci/cache_kernels.py save
+          path: lunarsky/data/spk/planets/de430.bsp
+          key: kernel-de430-${{ runner.os }}
+      - name: Download kernels
         if: steps.cache-kernels.outputs.cache-hit != 'true'
+        run: |
+          pip install -e .
+          python -c "from lunarsky.spice_utils import download_big_kernels; download_big_kernels()"
 
   tests:
     env:
@@ -72,18 +74,11 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Get current date
-        id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
       - name: load-cache
         uses: actions/cache@v3
         with:
-          path: ~/ap_cache
-          key: kernel_cache-${{ steps.date.outputs.date }}
-      - name: load kernels
-        run: |
-          pip install astropy
-          python ./ci/cache_kernels.py load
+          path: lunarsky/data/spk/planets/de430.bsp
+          key: kernel-de430-${{ runner.os }}
       - name: Install
         run: |
           pip install pytest pytest-cov
