@@ -1,7 +1,6 @@
 import numpy as np
 import os
 import urllib.request
-import warnings
 from filelock import FileLock
 from astropy.utils.console import ProgressBar
 from astropy.coordinates.matrix_utilities import rotation_matrix
