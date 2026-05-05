@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import numpy as np
 from astropy import units as u
 from astropy.units.quantity import QuantityInfoBase
@@ -166,6 +168,34 @@ class MoonLocationInfo(QuantityInfoBase):
         return out
 
 
+@lru_cache
+def _get_sites(cache=False):
+    import zipfile
+    from astropy.utils.data import get_readable_fileobj
+    from fastkml import KML
+    from fastkml import Placemark
+    from fastkml.utils import find, find_all
+
+    with get_readable_fileobj(
+        "https://asc-planetarynames-data.s3.us-west-2.amazonaws.com/"
+        "MOON_nomenclature_center_pts.kmz",
+        encoding="binary",
+        cache=cache,
+    ) as downloaded:
+        path = zipfile.Path(downloaded)
+        (kml_path,) = path.glob("*.kml")
+        with kml_path.open() as kml_file:
+            kml = KML.parse(kml_file)
+
+    return {
+        place.name.lower(): (
+            float(find(place.extended_data, name="center_lon").value),
+            float(find(place.extended_data, name="center_lat").value),
+        )
+        for place in find_all(kml, of_type=Placemark)
+    }
+
+
 class MoonLocation(u.Quantity):
     """
     Location on the Moon.
@@ -229,6 +259,30 @@ class MoonLocation(u.Quantity):
                     'exceptions "{}" and "{}"'.format(exc_selenocentric, exc_selenodetic)
                 )
         return self
+
+    @classmethod
+    def of_site(cls, site_name: str):
+        """Resolve a place name to a location on the moon.
+
+        Look up a surface feature in the USGS Gazetteer of Planetary
+        Nomenclature (https://planetarynames.wr.usgs.gov/Page/MOON/target).
+
+        Notes
+        -----
+        - This data source provides the longitude and latitude, but not the
+          height, of the approximate centers of craters and other features.
+        - Locations are referenced to the IAU2000 selenoid.
+        - This function downloads a KML file that is 11M in size the first time
+          that you call it in a given Python session.
+
+        Examples
+        --------
+        >>> MoonLocation.of_site("Shackleton")
+        <MoonLocation (-6402.66993685, 7690.17998521, -1737371.18283615) m>
+        """
+        sites = _get_sites()
+        lon_lat = sites[site_name.lower()]
+        return cls.from_selenodetic(*lon_lat, ellipsoid="IAU2000")
 
     @classmethod
     def _set_site_id(cls, inst):
