@@ -86,8 +86,7 @@ jobs:
           python ./ci/cache_kernels.py load
       - name: Install
         run: |
-          pip install pytest pytest-cov
-          pip install .
+          pip install .[test] pytest-cov
       - name: Run Tests
         run: |
           python -m pytest --cov=lunarsky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
