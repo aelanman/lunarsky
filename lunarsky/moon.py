@@ -61,12 +61,25 @@ class CE1LAM10SelenodeticRepresentation(BaseGeodeticRepresentation):
     _flattening = 1 / 973.463
 
 
+class IAU2000SelenodeticRepresentation(BaseGeodeticRepresentation):
+    """Lunar ellipsoid as a sphere defined by IAU 2000
+
+    Radius defined by the "Report of the IAU/IAG Working Group on Cartographic
+    Coordinates and Rotational Elements of the Planets and Satellites: 2000"
+    (https://doi.org/10.1023/A:1013939327465).
+    """
+
+    _equatorial_radius = 1737.4 * u.km
+    _flattening = 0.0
+
+
 # Define reference ellipsoids
 SELENOIDS = {
     "SPHERE": SPHERESelenodeticRepresentation,
     "GSFC": GSFCSelenodeticRepresentation,
     "GRAIL23": GRAIL23SelenodeticRepresentation,
     "CE-1-LAM-GEO": CE1LAM10SelenodeticRepresentation,
+    "IAU2000": IAU2000SelenodeticRepresentation,
 }
 
 
@@ -341,7 +354,8 @@ class MoonLocation(u.Quantity):
             from the center of mass of the Moon.
         ellipsoid : str, optional
             Name of the reference ellipsoid to use (default: 'SPHERE').
-            Available ellipsoids are:  'SPHERE', 'GRAIL23', 'CE-1-LAM-GEO'.
+            Available ellipsoids are:  'SPHERE', 'GSFC', 'GRAIL23',
+            'CE-1-LAM-GEO', 'IAU2000'.
             See docstrings for classes in ELLIPSOIDS dictionary for references.
 
         Raises
