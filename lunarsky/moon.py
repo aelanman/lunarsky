@@ -12,18 +12,14 @@ from astropy.utils import minversion
 
 COPY_IF_NEEDED = None if minversion(np, "2.0") else False
 
-LUNAR_RADIUS = 1737.1e3  # m
-
 __all__ = ["MoonLocation", "MoonLocationAttribute"]
 
 
 class SPHERESelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid as a sphere
-
-    Radius defined by lunarsky.spice_utils.LUNAR_RADIUS
     """
 
-    _equatorial_radius = LUNAR_RADIUS * u.m
+    _equatorial_radius = 1737.1e3 * u.m
     _flattening = 0.0
 
 
@@ -36,7 +32,7 @@ class GSFCSelenodeticRepresentation(BaseGeodeticRepresentation):
     _equatorial_radius = 1738.1e3 * u.m
     _flattening = 0.0012
 
-
+e
 class GRAIL23SelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid defined by gravimetry of GRAIL data.
 
