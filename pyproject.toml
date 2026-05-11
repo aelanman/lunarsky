@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=77", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lunarsky"
+description = "Astropy support for selenocentric (Moon) reference frames and lunar surface observatories."
+license = "BSD-3-Clause"
+license-files = [ "LICENSE" ]
+readme = "README.md"
+authors = [
+    { name = "Adam E. Lanman" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+keywords = [
+    "astronomy",
+    "moon",
+    "spice",
+]
+dependencies = [
+    "numpy>=1.15",
+    "astropy>=6.0.0",
+    "spiceypy",
+    "jplephem",
+]
+requires-python = ">=3.8"
+dynamic = [ "version" ]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+source = "https://github.com/aelanman/lunarsky"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+local_scheme = "no-local-version"
+version_file = "lunarsky/version.py"
+
+[tool.pytest]
+addopts = [ "--ignore=scripts" ]
