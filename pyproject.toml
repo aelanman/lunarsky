@@ -25,7 +25,6 @@ dependencies = [
     "numpy>=1.15",
     "astropy>=6.0.0",
     "jplephem",
-    "filelock",
     "fastkml[lxml]",
 ]
 requires-python = ">=3.8"

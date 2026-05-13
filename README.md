@@ -31,13 +31,13 @@ git clone https://github.com/aelanman/lunarsky
 python setup.py install
 ```
 
-Once you've installed lunarsky, you will need to ensure the relevant SPICE kernel files are downloaded
-before running. To do this, run:
+The first time lunarsky is used, it will automatically download the JPL DE430 ephemeris
+(~150 MB) into astropy's data cache (`~/.astropy/cache/`). Subsequent uses read from the
+cache. To pre-fetch the kernel (e.g. before going offline, or in CI), run:
 ```
 from lunarsky import spice_utils
 spice_utils.download_big_kernels()
 ```
-After that, the kernel files will be stored with the package data. This is around 150 MB.
 
 ## Usage
 

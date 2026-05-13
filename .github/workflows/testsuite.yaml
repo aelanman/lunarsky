@@ -45,13 +45,13 @@ jobs:
         id: cache-kernels
         uses: actions/cache@v3
         with:
-          path: lunarsky/data/spk/planets/de430.bsp
+          path: ~/.astropy/cache/download
           key: kernel-de430-${{ runner.os }}
       - name: Download kernels
         if: steps.cache-kernels.outputs.cache-hit != 'true'
         run: |
-          pip install -e .
-          python -c "from lunarsky.spice_utils import download_big_kernels; download_big_kernels()"
+          pip install .
+          python -c "from lunarsky.spice_utils import download_big_kernels; download_big_kernels(show_progress=False)"
 
   tests:
     env:
@@ -77,7 +77,7 @@ jobs:
       - name: load-cache
         uses: actions/cache@v3
         with:
-          path: lunarsky/data/spk/planets/de430.bsp
+          path: ~/.astropy/cache/download
           key: kernel-de430-${{ runner.os }}
       - name: Install
         run: |
