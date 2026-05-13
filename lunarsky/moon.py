@@ -32,7 +32,6 @@ class GSFCSelenodeticRepresentation(BaseGeodeticRepresentation):
     _equatorial_radius = 1738.1e3 * u.m
     _flattening = 0.0012
 
-e
 class GRAIL23SelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid defined by gravimetry of GRAIL data.
 
