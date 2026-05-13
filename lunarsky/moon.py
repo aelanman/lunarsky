@@ -183,7 +183,9 @@ def _get_sites(cache=False):
         cache=cache,
     ) as downloaded:
         path = zipfile.Path(downloaded)
-        (kml_path,) = path.glob("*.kml")
+        # FIXME: this requires Python >= 3.12.
+        # (kml_path,) = path.glob("*.kml")
+        (kml_path,) = (p for p in path.iterdir() if p.suffix == ".kml")
         with kml_path.open() as kml_file:
             kml = KML.parse(kml_file)
 
