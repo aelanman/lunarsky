@@ -1,11 +1,3 @@
-import sys
-
-if sys.platform == "darwin":
-    # On MacOS, need to set multiprocessing to fork by default
-    import multiprocessing
-
-    multiprocessing.set_start_method("fork", force=True)
-
 from .moon import *  # noqa
 from .mcmf import *  # noqa
 from .topo import *  # noqa
