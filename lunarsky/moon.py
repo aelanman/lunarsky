@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import numpy as np
 from astropy import units as u
 from astropy.units.quantity import QuantityInfoBase
@@ -54,12 +56,25 @@ class CE1LAM10SelenodeticRepresentation(BaseGeodeticRepresentation):
     _flattening = 1 / 973.463
 
 
+class IAU2000SelenodeticRepresentation(BaseGeodeticRepresentation):
+    """Lunar ellipsoid as a sphere defined by IAU 2000
+
+    Radius defined by the "Report of the IAU/IAG Working Group on Cartographic
+    Coordinates and Rotational Elements of the Planets and Satellites: 2000"
+    (https://doi.org/10.1023/A:1013939327465).
+    """
+
+    _equatorial_radius = 1737.4 * u.km
+    _flattening = 0.0
+
+
 # Define reference ellipsoids
 SELENOIDS = {
     "SPHERE": SPHERESelenodeticRepresentation,
     "GSFC": GSFCSelenodeticRepresentation,
     "GRAIL23": GRAIL23SelenodeticRepresentation,
     "CE-1-LAM-GEO": CE1LAM10SelenodeticRepresentation,
+    "IAU2000": IAU2000SelenodeticRepresentation,
 }
 
 
@@ -146,6 +161,34 @@ class MoonLocationInfo(QuantityInfoBase):
         return out
 
 
+@lru_cache
+def _get_sites(cache=False):
+    import zipfile
+    from astropy.utils.data import get_readable_fileobj
+    from fastkml import KML
+    from fastkml import Placemark
+    from fastkml.utils import find, find_all
+
+    with get_readable_fileobj(
+        "https://asc-planetarynames-data.s3.us-west-2.amazonaws.com/"
+        "MOON_nomenclature_center_pts.kmz",
+        encoding="binary",
+        cache=cache,
+    ) as downloaded:
+        path = zipfile.Path(downloaded)
+        (kml_path,) = path.glob("*.kml")
+        with kml_path.open() as kml_file:
+            kml = KML.parse(kml_file)
+
+    return {
+        place.name.lower(): (
+            float(find(place.extended_data, name="center_lon").value),
+            float(find(place.extended_data, name="center_lat").value),
+        )
+        for place in find_all(kml, of_type=Placemark)
+    }
+
+
 class MoonLocation(u.Quantity):
     """
     Location on the Moon.
@@ -199,6 +242,80 @@ class MoonLocation(u.Quantity):
                     'exceptions "{}" and "{}"'.format(exc_selenocentric, exc_selenodetic)
                 )
         return self
+
+    @classmethod
+    def of_site(cls, site_name: str):
+        """Resolve a place name to a location on the moon.
+
+        Look up a surface feature in the USGS Gazetteer of Planetary
+        Nomenclature (https://planetarynames.wr.usgs.gov/Page/MOON/target).
+
+        Notes
+        -----
+        - This data source provides the longitude and latitude, but not the
+          height, of the approximate centers of craters and other features.
+        - Locations are referenced to the IAU2000 selenoid.
+        - This function downloads a KML file that is 11M in size the first time
+          that you call it in a given Python session.
+
+        Examples
+        --------
+        >>> MoonLocation.of_site("Shackleton")
+        <MoonLocation (-6402.66993685, 7690.17998521, -1737371.18283615) m>
+        """
+        sites = _get_sites()
+        lon_lat = sites[site_name.lower()]
+        return cls.from_selenodetic(*lon_lat, ellipsoid="IAU2000")
+
+    @classmethod
+    def _set_site_id(cls, inst):
+        """
+        Set the station ID number and manage registry of defined stations.
+        """
+        if inst.isscalar:
+            llh_arr = [
+                (
+                    inst.lon.deg.item(),
+                    inst.lat.deg.item(),
+                    inst.height.to_value("km").item(),
+                )
+            ]
+            ncrds = 1
+        else:
+            llh_arr = zip(inst.lon.deg, inst.lat.deg, inst.height.to_value("km"))
+            ncrds = inst.lon.size
+
+        statids = []
+        if cls._avail_stat_ids is None:
+            cls._avail_stat_ids = list(range(999, 0, -1))
+
+        if len(cls._avail_stat_ids) < ncrds:
+            raise ValueError("Too many unique MoonLocation objects open at once.")
+
+        for llh in llh_arr:
+            lonlatheight = "_".join(
+                ["{:.4f}".format(ll) for ll in llh] + [inst._ellipsoid]
+            )
+            if lonlatheight not in cls._existing_locs:
+                new_stat_id = cls._avail_stat_ids.pop()
+                cls._existing_locs.append(lonlatheight)
+                statids.append(new_stat_id)
+                cls._inuse_stat_ids.append(new_stat_id)
+                cls._ref_count.append(1)
+            else:
+                ind = cls._existing_locs.index(lonlatheight)
+                cls._ref_count[ind] += 1
+                statids.append(cls._inuse_stat_ids[ind])
+        inst.station_ids = statids
+        return inst
+
+    def _set_station_id(self):
+        """
+        Run classmethod for setting station IDs.
+
+        Convenience function used for testing mostly
+        """
+        self.__class__._set_site_id(self)
 
     @classmethod
     def from_selenocentric(cls, x, y, z, unit=None):
@@ -274,7 +391,8 @@ class MoonLocation(u.Quantity):
             from the center of mass of the Moon.
         ellipsoid : str, optional
             Name of the reference ellipsoid to use (default: 'SPHERE').
-            Available ellipsoids are:  'SPHERE', 'GRAIL23', 'CE-1-LAM-GEO'.
+            Available ellipsoids are:  'SPHERE', 'GSFC', 'GRAIL23',
+            'CE-1-LAM-GEO', 'IAU2000'.
             See docstrings for classes in ELLIPSOIDS dictionary for references.
 
         Raises

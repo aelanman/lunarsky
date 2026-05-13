@@ -321,7 +321,7 @@ def test_topo_zenith_shift(ell, lat, lon):
     #   Also fails near poles.
 
     # Comparing against the SPHERE ellipsoid. Test fails for this due to divide by zero
-    if ell == "SPHERE":
+    if ell in {"SPHERE", "IAU2000"}:
         return
 
     lat *= un.deg

@@ -26,12 +26,16 @@ dependencies = [
     "astropy>=6.0.0",
     "spiceypy",
     "jplephem",
+    "fastkml[lxml]",
 ]
 requires-python = ">=3.8"
 dynamic = [ "version" ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = [
+    "pytest",
+    "pytest-doctestplus",
+]
 
 [project.urls]
 source = "https://github.com/aelanman/lunarsky"
@@ -45,4 +49,7 @@ local_scheme = "no-local-version"
 version_file = "lunarsky/version.py"
 
 [tool.pytest]
-addopts = [ "--ignore=scripts" ]
+addopts = [
+    "--doctest-plus",
+    "--ignore=scripts",
+]
