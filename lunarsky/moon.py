@@ -18,8 +18,7 @@ __all__ = ["MoonLocation", "MoonLocationAttribute"]
 
 
 class SPHERESelenodeticRepresentation(BaseGeodeticRepresentation):
-    """Lunar ellipsoid as a sphere
-    """
+    """Lunar ellipsoid as a sphere"""
 
     _equatorial_radius = 1737.1e3 * u.m
     _flattening = 0.0
@@ -33,6 +32,7 @@ class GSFCSelenodeticRepresentation(BaseGeodeticRepresentation):
 
     _equatorial_radius = 1738.1e3 * u.m
     _flattening = 0.0012
+
 
 class GRAIL23SelenodeticRepresentation(BaseGeodeticRepresentation):
     """Lunar ellipsoid defined by gravimetry of GRAIL data.
