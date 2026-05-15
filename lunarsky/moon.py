@@ -527,8 +527,8 @@ class MoonLocation(u.Quantity):
 
     mcmf = property(
         get_mcmf,
-        doc="""An `~astropy.coordinates.MCMF` object  with
-                                     or the location of this object at the
+        doc="""An `~astropy.coordinates.MCMF` object
+                                     for the location of this object at the
                                      default ``obstime``.""",
     )
 
