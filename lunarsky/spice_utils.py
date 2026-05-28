@@ -25,21 +25,22 @@ def _read_bpc(filepath):
     """
     from jplephem.daf import DAF
 
-    daf = DAF(open(filepath, "rb"))
+    with open(filepath, "rb") as f:
+        daf = DAF(f)
 
-    segments = list(daf.summaries())
-    if len(segments) != 1:
-        raise ValueError(f"Expected 1 segment in binary PCK, got {len(segments)}")
+        segments = list(daf.summaries())
+        if len(segments) != 1:
+            raise ValueError(f"Expected 1 segment in binary PCK, got {len(segments)}")
 
-    name, values = segments[0]
-    data_type = int(values[4])
-    start_addr = int(values[5])
-    end_addr = int(values[6])
+        name, values = segments[0]
+        data_type = int(values[4])
+        start_addr = int(values[5])
+        end_addr = int(values[6])
 
-    if data_type != 2:
-        raise ValueError(f"Unsupported binary PCK data type {data_type}")
+        if data_type != 2:
+            raise ValueError(f"Unsupported binary PCK data type {data_type}")
 
-    arr = daf.read_array(start_addr, end_addr)
+        arr = daf.read_array(start_addr, end_addr)
 
     init_epoch = arr[-4]
     interval = arr[-3]
