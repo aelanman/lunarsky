@@ -196,8 +196,18 @@ def _ensure_spk():
 
 
 def _et_to_jd(ets):
-    """Convert ET (TDB seconds past J2000) to Julian date."""
-    return np.asarray(ets) / 86400.0 + 2451545.0
+    """Convert ET (TDB seconds past J2000) to a two-part Julian date.
+
+    Returns (jd1, jd2) where jd1 = 2451545.0 (J2000 epoch) and jd2 holds
+    the fractional offset in days. Splitting preserves time precision in
+    `segment.compute(jd1, jd2)` calls — a single double-precision JD at
+    present-day values (~2.46e6) carries only ~26 microseconds of time
+    resolution, which propagates into ~0.8 m of position error at the
+    Moon's barycentric speed (~30 km/s). The two-part form recovers
+    sub-microsecond precision.
+    """
+    jd2 = np.asarray(ets) / 86400.0
+    return 2451545.0, jd2
 
 
 def _pos_ssb_j2000(body_id, ets):
@@ -220,15 +230,16 @@ def _pos_ssb_j2000(body_id, ets):
         return np.zeros((len(ets), 3))
 
     spk = _ensure_spk()
-    jd = _et_to_jd(ets)
+    jd1, jd2 = _et_to_jd(ets)
 
     if body_id == 301:
-        emb = np.asarray(spk[0, 3].compute(jd)).T  # spk keys are tuples (center, target)
-        moon_emb = np.asarray(spk[3, 301].compute(jd)).T
+        # spk keys are tuples (center, target). Two-arg compute() preserves time precision.
+        emb = np.asarray(spk[0, 3].compute(jd1, jd2)).T
+        moon_emb = np.asarray(spk[3, 301].compute(jd1, jd2)).T
         return emb + moon_emb
     elif body_id == 399:
-        emb = np.asarray(spk[0, 3].compute(jd)).T
-        earth_emb = np.asarray(spk[3, 399].compute(jd)).T
+        emb = np.asarray(spk[0, 3].compute(jd1, jd2)).T
+        earth_emb = np.asarray(spk[3, 399].compute(jd1, jd2)).T
         return emb + earth_emb
     else:
         raise ValueError(f"Unsupported body ID {body_id}")
