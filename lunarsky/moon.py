@@ -12,22 +12,15 @@ from astropy.coordinates.representation import (
 from astropy.coordinates.attributes import Attribute
 from astropy.utils import minversion
 
-from .spice_utils import remove_topo
-
 COPY_IF_NEEDED = None if minversion(np, "2.0") else False
-
-LUNAR_RADIUS = 1737.1e3  # m
 
 __all__ = ["MoonLocation", "MoonLocationAttribute"]
 
 
 class SPHERESelenodeticRepresentation(BaseGeodeticRepresentation):
-    """Lunar ellipsoid as a sphere
+    """Lunar ellipsoid as a sphere"""
 
-    Radius defined by lunarsky.spice_utils.LUNAR_RADIUS
-    """
-
-    _equatorial_radius = LUNAR_RADIUS * u.m
+    _equatorial_radius = 1737.1e3 * u.m
     _flattening = 0.0
 
 
@@ -231,16 +224,6 @@ class MoonLocation(u.Quantity):
     _location_dtype = np.dtype({"names": ["x", "y", "z"], "formats": [np.float64] * 3})
     _array_dtype = np.dtype((np.float64, (3,)))
 
-    # Manage the set of defined ephemerides.
-    # Class attributes only
-    _inuse_stat_ids = []
-    _avail_stat_ids = None
-    _existing_locs = []
-    _ref_count = []
-
-    # This instance's station id(s)
-    station_ids = []
-
     info = MoonLocationInfo()
 
     def __new__(cls, *args, **kwargs):
@@ -283,56 +266,6 @@ class MoonLocation(u.Quantity):
         sites = _get_sites()
         lon_lat = sites[site_name.lower()]
         return cls.from_selenodetic(*lon_lat, ellipsoid="IAU2000")
-
-    @classmethod
-    def _set_site_id(cls, inst):
-        """
-        Set the station ID number and manage registry of defined stations.
-        """
-        if inst.isscalar:
-            llh_arr = [
-                (
-                    inst.lon.deg.item(),
-                    inst.lat.deg.item(),
-                    inst.height.to_value("km").item(),
-                )
-            ]
-            ncrds = 1
-        else:
-            llh_arr = zip(inst.lon.deg, inst.lat.deg, inst.height.to_value("km"))
-            ncrds = inst.lon.size
-
-        statids = []
-        if cls._avail_stat_ids is None:
-            cls._avail_stat_ids = list(range(999, 0, -1))
-
-        if len(cls._avail_stat_ids) < ncrds:
-            raise ValueError("Too many unique MoonLocation objects open at once.")
-
-        for llh in llh_arr:
-            lonlatheight = "_".join(
-                ["{:.4f}".format(ll) for ll in llh] + [inst._ellipsoid]
-            )
-            if lonlatheight not in cls._existing_locs:
-                new_stat_id = cls._avail_stat_ids.pop()
-                cls._existing_locs.append(lonlatheight)
-                statids.append(new_stat_id)
-                cls._inuse_stat_ids.append(new_stat_id)
-                cls._ref_count.append(1)
-            else:
-                ind = cls._existing_locs.index(lonlatheight)
-                cls._ref_count[ind] += 1
-                statids.append(cls._inuse_stat_ids[ind])
-        inst.station_ids = statids
-        return inst
-
-    def _set_station_id(self):
-        """
-        Run classmethod for setting station IDs.
-
-        Convenience function used for testing mostly
-        """
-        self.__class__._set_site_id(self)
 
     @classmethod
     def from_selenocentric(cls, x, y, z, unit=None):
@@ -457,35 +390,6 @@ class MoonLocation(u.Quantity):
     def __str__(self):
         return self.__repr__()
 
-    def copy(self):
-        # Necessary to preserve station_ids list
-        return self.__copy__()
-
-    def __copy__(self):
-        # Ensure that the station_ids are copied as well under shallow copy
-        obj = super().copy()
-        obj.station_ids = self.station_ids
-        return obj
-
-    def __del__(self):
-        # Remove this MoonLocation's station_ids from _inuse_stat_ids and
-        # locations from _existing_locs.
-        # Also clear the corresponding frames from spice variable pool.
-        for si, stat_id in enumerate(self.station_ids):
-            try:
-                ind = self.__class__._inuse_stat_ids.index(stat_id)
-            except ValueError:
-                continue
-            count = self.__class__._ref_count[ind]
-            if count <= 1:
-                sid = self.__class__._inuse_stat_ids.pop(ind)
-                self.__class__._existing_locs.pop(ind)
-                self.__class__._avail_stat_ids.insert(0, sid)
-                remove_topo(stat_id)
-                self.__class__._ref_count.pop(ind)
-            else:
-                self.__class__._ref_count[ind] -= 1
-
     @property
     def selenodetic(self):
         """Convert to selenodetic coordinates."""
@@ -532,7 +436,7 @@ class MoonLocation(u.Quantity):
 
     @property
     def lat(self):
-        """Longitude of the location"""
+        """Latitude of the location"""
         return self.selenodetic[1]
 
     @property
@@ -573,7 +477,7 @@ class MoonLocation(u.Quantity):
 
     mcmf = property(
         get_mcmf,
-        doc="""An `~astropy.coordinates.MCMF` object  with
+        doc="""An `~astropy.coordinates.MCMF` object
                                      for the location of this object at the
                                      default ``obstime``.""",
     )

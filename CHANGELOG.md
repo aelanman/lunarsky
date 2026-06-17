@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.1] -- 2026-06-16
+
+## Fixed
+- Using dynamic barycentric time (tdb) instead of terrestrial time (tt) in transformations (this was a mistake)
+- Fixes precision issues due to truncating to 7 digits when manually defining spice kernels
+
+## Changed
+- spice_utils now has a PCK file reader to read the moon's planetary constants
+- Transforms are now defined in Python, not using SPICE
+
+## Deprecated
+- Removed dependency on spiceypy for coordinate definitions. Kernels are now handled with jplephem
+
 ## [0.2.6] -- 2024-12-12
 ## Fixed
 - Avoid deprecation warning with numpy.broadcast_shape

@@ -24,7 +24,6 @@ keywords = [
 dependencies = [
     "numpy>=1.15",
     "astropy>=6.0.0",
-    "spiceypy",
     "jplephem",
     "fastkml[lxml]",
 ]

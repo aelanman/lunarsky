@@ -17,8 +17,6 @@ from astropy.time import Time
 from astropy.coordinates.transformations import FunctionTransformWithFiniteDifference
 from astropy.coordinates.builtin_frames.icrs import ICRS
 
-import spiceypy as spice
-
 __all__ = ["MCMF"]
 
 _J2000 = Time("J2000", scale="tt")
@@ -56,6 +54,7 @@ class MCMF(BaseCoordinateFrame):
 
 
 def make_transform(coo, toframe):
+    from .spice_utils import j2000_to_moon_me, body_position
 
     ap_to_spice = {"icrs": ("J2000", 0), "mcmf": ("MOON_ME", 301)}
 
@@ -67,12 +66,12 @@ def make_transform(coo, toframe):
     obstime = toframe.obstime if to_mcmf else coo.obstime
 
     # Make arrays
-    ets = np.atleast_1d((obstime - _J2000).sec)
+    ets = np.atleast_1d((obstime.tdb - _J2000).sec)
     shape_out = np.broadcast_shapes(coo.shape, ets.shape)
 
     coo_cart = coo.cartesian
 
-    mats = np.stack([spice.pxform("J2000", "MOON_ME", et) for et in ets], axis=0)
+    mats = j2000_to_moon_me(ets)
     if not to_mcmf:
         mats = np.linalg.inv(mats)
 
@@ -85,11 +84,8 @@ def make_transform(coo, toframe):
     # If not unitspherical, shift by origin vector before rotating.
     if not is_unitspherical:
         # Make origin vector(s) in coo's frame.
-        orig_posvel = (
-            np.asarray([spice.spkgeo(to_id, et, from_name, from_id)[0] for et in ets])
-            * un.km
-        )
-        coo_cart -= CartesianRepresentation((orig_posvel.T)[:3])
+        orig_pos = body_position(to_id, ets, from_name, from_id) * un.km
+        coo_cart -= CartesianRepresentation(orig_pos.T)
 
     newrepr = coo_cart.transform(mats).reshape(shape_out)
 

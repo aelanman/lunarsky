@@ -6,7 +6,7 @@ from astropy import version
 from astropy.coordinates import EarthLocation, Longitude
 
 from .moon import MoonLocation, COPY_IF_NEEDED
-import spiceypy as spice
+from .spice_utils import moon_me_to_j2000
 
 __all__ = ["Time", "TimeDelta"]
 
@@ -70,8 +70,8 @@ class Time(astropy.time.Time):
         # to the selenodetic coordinate system. "self.location" must
         # be defined in order to get here.
 
-        et = np.atleast_1d((self - Time("J2000")).sec)
-        mats = np.array([spice.pxform("MOON_ME", "J2000", t) for t in et])
+        et = np.atleast_1d((self.tdb - Time("J2000")).sec)
+        mats = moon_me_to_j2000(et)
 
         # Zenith vector
         zvec = self.location.mcmf.cartesian.xyz
