@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+## Changed
+- Dropped support for Python 3.8
+
 ## [1.0.1] -- 2026-06-16
 
 ## Fixed
