@@ -27,7 +27,7 @@ dependencies = [
     "jplephem",
     "fastkml[lxml]",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dynamic = [ "version" ]
 
 [project.optional-dependencies]

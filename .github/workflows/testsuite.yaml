@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ENV_NAME: linting
-      PYTHON: 3.8
+      PYTHON: 3.9
     steps:
       - uses: actions/checkout@v3
         with:
