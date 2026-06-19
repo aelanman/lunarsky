@@ -1,17 +1,14 @@
 # Changelog
 
-## [Unreleased]
-
-## Changed
-- Dropped support for Python 3.8
-
-## [1.0.1] -- 2026-06-16
+## [1.0.1] -- 2026-06-19
 
 ## Fixed
 - Using dynamic barycentric time (tdb) instead of terrestrial time (tt) in transformations (this was a mistake)
 - Fixes precision issues due to truncating to 7 digits when manually defining spice kernels
 
 ## Changed
+- Use trusted publishers in pypi/testpypi releases from CI instead of api keys
+- Dropped support for Python 3.8
 - spice_utils now has a PCK file reader to read the moon's planetary constants
 - Transforms are now defined in Python, not using SPICE
 
