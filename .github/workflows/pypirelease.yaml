@@ -10,6 +10,11 @@ jobs:
   build-n-publish:
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
     runs-on: ubuntu-latest
+    permissions:
+      # id-token: write is required for PyPI Trusted Publishing (OIDC).
+      # contents: read is the default but spelled out for clarity.
+      id-token: write
+      contents: read
     steps:
     - uses: actions/checkout@v5
     - name: Set up Python 3.9
@@ -34,13 +39,11 @@ jobs:
       uses: pypa/gh-action-pypi-publish@v1.13.0
       if: github.event_name == 'release'
       with:
-        user: __token__
-        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         repository_url: https://test.pypi.org/legacy/
         skip_existing: true
     - name: Publish distribution 📦 to PyPI
-      if: github.event_name == 'release'
+      # Gate PyPI on a successful Test PyPI upload. success() is implicit in
+      # most if expressions but is added here explicitly so the dependency
+      # is visible to anyone reading the file.
+      if: success() && github.event_name == 'release'
       uses: pypa/gh-action-pypi-publish@v1.13.0
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
