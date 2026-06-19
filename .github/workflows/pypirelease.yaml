@@ -39,8 +39,8 @@ jobs:
       uses: pypa/gh-action-pypi-publish@v1.13.0
       if: github.event_name == 'release'
       with:
-        repository_url: https://test.pypi.org/legacy/
-        skip_existing: true
+        repository-url: https://test.pypi.org/legacy/
+        skip-existing: true
     - name: Publish distribution 📦 to PyPI
       # Gate PyPI on a successful Test PyPI upload. success() is implicit in
       # most if expressions but is added here explicitly so the dependency
