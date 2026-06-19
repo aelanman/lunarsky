@@ -41,6 +41,12 @@ jobs:
       with:
         repository-url: https://test.pypi.org/legacy/
         skip-existing: true
+    - name: Remove stale attestation files from dist/
+      # The Test PyPI step above writes *.publish.attestation files into dist/
+      # as a side effect of its upload. The PyPI step that follows refuses to
+      # overwrite existing attestation files, so we clear them out here.
+      if: github.event_name == 'release'
+      run: rm -f dist/*.publish.attestation
     - name: Publish distribution 📦 to PyPI
       # Gate PyPI on a successful Test PyPI upload. success() is implicit in
       # most if expressions but is added here explicitly so the dependency
