@@ -143,12 +143,43 @@ def j2000_to_moon_me(ets):
     dec = _cheby_eval(dec_coeffs, tau)
     w = _cheby_eval(w_coeffs, tau)
 
-    # J2000 -> MOON_PA: R3(W) @ R1(Dec) @ R3(RA)
-    # Then apply PA -> ME constant rotation
-    mats = np.zeros((len(ets), 3, 3))
-    for i in range(len(ets)):
-        j2000_to_pa = _R3(w[i]) @ _R1(dec[i]) @ _R3(ra[i])
-        mats[i] = _PA_TO_ME @ j2000_to_pa
+    # J2000 -> MOON_PA: R3(W) @ R1(Dec) @ R3(RA), batched over the N obstimes.
+    # Build each stack of 3x3 rotations elementwise then chain via einsum so
+    # there's no Python-level per-time loop. This is ~100x faster on large N.
+    cw, sw = np.cos(w), np.sin(w)
+    cd, sd = np.cos(dec), np.sin(dec)
+    cr, sr = np.cos(ra), np.sin(ra)
+    z = np.zeros_like(w)
+    o = np.ones_like(w)
+    # R3(angle) = [[ c, s, 0], [-s, c, 0], [0, 0, 1]]
+    R3_w = np.stack(
+        [
+            np.stack([cw, sw, z], axis=-1),
+            np.stack([-sw, cw, z], axis=-1),
+            np.stack([z, z, o], axis=-1),
+        ],
+        axis=-2,
+    )
+    R3_ra = np.stack(
+        [
+            np.stack([cr, sr, z], axis=-1),
+            np.stack([-sr, cr, z], axis=-1),
+            np.stack([z, z, o], axis=-1),
+        ],
+        axis=-2,
+    )
+    # R1(angle) = [[1, 0, 0], [0, c, s], [0, -s, c]]
+    R1_dec = np.stack(
+        [
+            np.stack([o, z, z], axis=-1),
+            np.stack([z, cd, sd], axis=-1),
+            np.stack([z, -sd, cd], axis=-1),
+        ],
+        axis=-2,
+    )
+    j2000_to_pa = np.einsum("nij,njk,nkl->nil", R3_w, R1_dec, R3_ra)
+    # Apply the constant PA -> ME rotation (broadcasts over N).
+    mats = np.einsum("ij,njk->nik", _PA_TO_ME, j2000_to_pa)
 
     return mats
 
@@ -284,8 +315,11 @@ def station_pos_ssb_j2000(pos_me_km, ets):
 
     Parameters
     ----------
-    pos_me_km : ndarray, shape (3,)
-        Station position in MOON_ME frame, in km.
+    pos_me_km : ndarray, shape (3,) or (N, 3)
+        Station position(s) in the MOON_ME frame, in km. A 1-D vector is
+        broadcast across all ``ets``; a 2-D array is treated as one position
+        per element of ``ets`` (used by the LunarTopo transform path to
+        evaluate multiple (et, location) pairs in a single batched call).
     ets : ndarray
         ET values.
 
@@ -295,9 +329,13 @@ def station_pos_ssb_j2000(pos_me_km, ets):
         Position in km.
     """
     ets = np.atleast_1d(np.asarray(ets, dtype=float))
+    pos_me_arr = np.asarray(pos_me_km)
     moon_ssb = _pos_ssb_j2000(301, ets)
     me_to_j2000 = moon_me_to_j2000(ets)
-    station_j2000 = np.einsum("nij,j->ni", me_to_j2000, pos_me_km)
+    if pos_me_arr.ndim == 1:
+        station_j2000 = np.einsum("nij,j->ni", me_to_j2000, pos_me_arr)
+    else:
+        station_j2000 = np.einsum("nij,nj->ni", me_to_j2000, pos_me_arr)
     return moon_ssb + station_j2000
 
 
