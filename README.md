@@ -13,23 +13,35 @@ Non-relativistic transformations are calculated using lunar orientation data fro
 
 
 ## Dependencies
-* `numpy`
-* `astropy>=6.0.0`
+
+Runtime:
+* `numpy>=1.15`
+* `astropy>=6.0`
 * `jplephem`
 * `fastkml[lxml]`
 
+The package also contains a small Cython extension (`lunarsky._core`)
+used on coordinate-transformation hot paths. When installing a pre-built
+wheel from PyPI you don't need a C compiler — the wheel ships pre-compiled
+binaries. Installing from source pulls `setuptools_scm`, `Cython>=3.0`,
+and a recent `numpy` automatically via the `[build-system]` requires in
+`pyproject.toml`; you only need a C toolchain available locally.
+
 ## Installation
 
-`lunarsky` may be installed with pip:
+The recommended install uses pip, which downloads a pre-built binary wheel
+for your platform — no compiler required:
 
 ```
 pip install lunarsky
 ```
 
-or from the repository:
+To install from source (e.g. to develop against the latest `main`), make
+sure a C compiler is available, then:
+
 ```
 git clone https://github.com/aelanman/lunarsky
-python setup.py install
+pip install ./lunarsky
 ```
 
 The first time lunarsky is used, it will automatically download the JPL DE430 ephemeris

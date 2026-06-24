@@ -1,6 +1,11 @@
 [build-system]
-requires = ["setuptools>=77", "setuptools_scm>=8"]
-build-backend = "setuptools.build_meta"
+requires = [
+    "scikit-build-core>=0.10",
+    "setuptools_scm>=8",
+    "Cython>=3.0",
+    "numpy>=1.25",
+]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "lunarsky"
@@ -39,8 +44,19 @@ test = [
 [project.urls]
 source = "https://github.com/aelanman/lunarsky"
 
-[tool.setuptools]
-include-package-data = true
+[tool.scikit-build]
+# scikit-build-core auto-detects the `lunarsky/` package because it matches
+# the project name; sibling top-level dirs (OLD/, temp/, experiments/, etc.)
+# are ignored automatically — no equivalent of setuptools' flat-layout
+# multi-package error.
+minimum-version = "build-system.requires"
+cmake.version = ">=3.15"
+build-dir = "build/{wheel_tag}"
+
+# Pull the package version from setuptools_scm via scikit-build-core's
+# bundled provider — keeps git-tag-based versioning the same as before.
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = ["lunarsky/version.py"]
 
 [tool.setuptools_scm]
 version_scheme = "no-guess-dev"
@@ -52,3 +68,24 @@ addopts = [
     "--doctest-plus",
     "--ignore=scripts",
 ]
+
+[tool.cibuildwheel]
+# Python versions and platform filters. Mirrored by the env vars in
+# .github/workflows/pypirelease.yaml so a local `cibuildwheel .` produces
+# the same matrix as CI.
+build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux_* *-win32 *-manylinux_i686"
+
+# Check that the compiled extension imports on each wheel.
+# The full pytest suite needs the DE430 kernel which we don't download
+# inside cibuildwheel's per-wheel container.
+test-command = "python -c \"import lunarsky._core; print('cython module ok')\""
+
+[tool.cibuildwheel.linux]
+archs = ["auto64"]
+
+[tool.cibuildwheel.macos]
+archs = ["auto"]
+
+[tool.cibuildwheel.windows]
+archs = ["auto64"]

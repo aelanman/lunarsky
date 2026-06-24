@@ -7,43 +7,107 @@ on:
 
 
 jobs:
-  build-n-publish:
-    name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
+  # ------------------------------------------------------------------
+  # Build pre-compiled wheels via cibuildwheel across linux/macos/windows
+  # for every supported Python (3.9-3.13 by default). Each combination
+  # produces its own wheel artifact; we collect them all in the publish
+  # job below.
+  # ------------------------------------------------------------------
+  build-wheels:
+    name: Build wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v3.0
+        env:
+          # Python versions: 3.9 through 3.13. Skip PyPy and free-threaded
+          # builds. Skip 32-bit and musllinux to keep the matrix small.
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-*"
+          CIBW_SKIP: "*-musllinux_* *-win32 *-manylinux_i686"
+          CIBW_ARCHS_LINUX: "auto64"
+          CIBW_ARCHS_MACOS: "auto"
+          CIBW_ARCHS_WINDOWS: "auto64"
+          # Run the (lightweight) smoke tests after install on each wheel.
+          # Skip the heavy SPICE-fixture-dependent ones since the kernel
+          # isn't downloaded in the build container.
+          CIBW_TEST_REQUIRES: "pytest"
+          CIBW_TEST_COMMAND: "python -c \"import lunarsky._core; print('cython module ok')\""
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
+
+  # ------------------------------------------------------------------
+  # Build the sdist on a single (linux) runner. sdist contains the
+  # .pyx source and lets users with unusual platforms fall back to
+  # compile-on-install.
+  # ------------------------------------------------------------------
+  build-sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist
+        run: |
+          python -m pip install --upgrade build
+          python -m build --sdist --outdir dist/
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  # ------------------------------------------------------------------
+  # Collect all wheels + sdist and publish via PyPI Trusted Publishing.
+  # Only runs on a real release event; manual workflow_dispatch builds
+  # the artifacts (useful for dry-running) but doesn't push.
+  # ------------------------------------------------------------------
+  publish:
+    name: Publish to TestPyPI and PyPI
+    needs: [build-wheels, build-sdist]
     runs-on: ubuntu-latest
     permissions:
       # id-token: write is required for PyPI Trusted Publishing (OIDC).
-      # contents: read is the default but spelled out for clarity.
       id-token: write
       contents: read
     steps:
-    - uses: actions/checkout@v5
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.9
-    - name: Install pypa/build
-      run: >-
-        python -m
-        pip install
-        build
-        --user
-    - name: Build a binary wheel and a source tarball
-      run: >-
-        python -m
-        build
-        --sdist
-        --wheel
-        --outdir dist/
-        .
-    - name: Publish distribution 📦 to Test PyPI
-      uses: pypa/gh-action-pypi-publish@v1.13.0
-      if: github.event_name == 'release'
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        skip-existing: true
-    - name: Publish distribution 📦 to PyPI
-      # Gate PyPI on a successful Test PyPI upload. success() is implicit in
-      # most if expressions but is added here explicitly so the dependency
-      # is visible to anyone reading the file.
-      if: success() && github.event_name == 'release'
-      uses: pypa/gh-action-pypi-publish@v1.13.0
+      - name: Download all distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          # Each matrix branch uploaded under a distinct name; flatten
+          # everything into a single dist/ directory.
+          merge-multiple: true
+
+      - name: Publish distribution 📦 to Test PyPI
+        uses: pypa/gh-action-pypi-publish@v1.13.0
+        if: github.event_name == 'release'
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+      - name: Remove stale attestation files from dist/
+        # The Test PyPI step above writes *.publish.attestation files into dist/
+        # as a side effect of its upload. The PyPI step that follows refuses to
+        # overwrite existing attestation files, so we clear them out here.
+        if: github.event_name == 'release'
+        run: rm -f dist/*.publish.attestation
+
+      - name: Publish distribution 📦 to PyPI
+        # Gate PyPI on a successful Test PyPI upload. success() is implicit in
+        # most if expressions but is added here explicitly so the dependency
+        # is visible to anyone reading the file.
+        if: success() && github.event_name == 'release'
+        uses: pypa/gh-action-pypi-publish@v1.13.0
