@@ -8,6 +8,25 @@ import astropy.units as unit
 from .mcmf import MCMF
 from .data import DATA_PATH
 
+# Cython compiled module `lunarsky._core`
+# Used for scalar-input fast transforms.
+# Fall back to pure-Python with a one-time warning for broken installs.
+try:
+    from . import _core as _core
+    _HAS_CORE = True
+except ImportError:  # pragma: no cover
+    import warnings
+    warnings.warn(
+        "lunarsky._core Cython extension not available; falling back to "
+        "the slower pure-Python path. Reinstall lunarsky to build it.",
+        ImportWarning,
+        stacklevel=2,
+    )
+    _core = None
+    _HAS_CORE = False
+
+_CORE_INITED = False
+
 _J2000 = Time("J2000")
 
 # ---------------------
@@ -109,19 +128,28 @@ _a3 = np.radians(0.30 / 3600)
 _PA_TO_ME = _R1(-_a3) @ _R2(-_a2) @ _R3(-_a1)
 
 
-def j2000_to_moon_me(ets):
-    """
-    Compute J2000 -> MOON_ME rotation matrices.
+def _ensure_core_initialized():
+    """Push PCK + PA->ME state into the Cython module on first use."""
+    global _CORE_INITED
+    if not _HAS_CORE or _CORE_INITED:
+        return _HAS_CORE
+    pck = _ensure_pck()
+    # The PCK data comes from jplephem.daf as a read-only memmap-backed
+    # array; Cython memoryviews refuse non-writable buffers, so copy.
+    _core.init(
+        float(pck["init_epoch"]),
+        float(pck["interval"]),
+        int(pck["n_coeffs"]),
+        int(pck["n_records"]),
+        np.array(pck["data"], dtype=np.float64, copy=True, order="C"),
+        np.array(_PA_TO_ME, dtype=np.float64, copy=True, order="C"),
+    )
+    _CORE_INITED = True
+    return True
 
-    Parameters
-    ----------
-    ets : float or array_like
-        TDB seconds past J2000.
 
-    Returns
-    -------
-    mats : ndarray, shape (..., 3, 3)
-    """
+def _j2000_to_moon_me_impl(ets):
+    """Vectorized J2000 -> MOON_ME, used for array inputs."""
     pck = _ensure_pck()
     ets = np.atleast_1d(np.asarray(ets, dtype=float))
 
@@ -180,6 +208,30 @@ def j2000_to_moon_me(ets):
     mats = np.einsum("ij,njk->nik", _PA_TO_ME, j2000_to_pa)
 
     return mats
+
+
+def j2000_to_moon_me(ets):
+    """
+    Compute J2000 -> MOON_ME rotation matrices.
+
+    For scalar input, dispatches to the compiled Cython hot path which
+    avoids ~150 μs of Python/numpy dispatch overhead per call. Array
+    input uses the vectorized pure-Python path.
+
+    Parameters
+    ----------
+    ets : float or array_like
+        TDB seconds past J2000.
+
+    Returns
+    -------
+    mats : ndarray, shape (N, 3, 3)
+    """
+    arr = np.atleast_1d(np.asarray(ets, dtype=float))
+    if arr.size == 1 and _ensure_core_initialized():
+        # Cython scalar fast-path. Wrap to (1, 3, 3) for shape consistency.
+        return _core.j2000_to_moon_me_scalar(float(arr[0]))[np.newaxis, :, :]
+    return _j2000_to_moon_me_impl(arr)
 
 
 def moon_me_to_j2000(ets):
@@ -341,6 +393,11 @@ def topo_rotation_matrix(lat_deg, lon_deg):
     """
     Compute the MOON_ME -> topocentric (E/N/U) rotation matrix for a surface location.
 
+    Dispatches to the compiled Cython hot path when available; otherwise
+    falls back to the astropy rotation_matrix chain. Pyuvsim's task
+    generator calls this once per (baseline, time, freq) tuple, so the
+    per-call savings are load-bearing.
+
     Parameters
     ----------
     lat_deg, lon_deg : float
@@ -350,6 +407,8 @@ def topo_rotation_matrix(lat_deg, lon_deg):
     -------
     matrix : ndarray, shape (3, 3)
     """
+    if _HAS_CORE:
+        return _core.topo_rotation_matrix(float(lat_deg), float(lon_deg))
     ecef_to_enu = np.matmul(
         rotation_matrix(-lon_deg, "z", unit="deg"),
         rotation_matrix(lat_deg, "y", unit="deg"),
