@@ -144,8 +144,6 @@ def j2000_to_moon_me(ets):
     w = _cheby_eval(w_coeffs, tau)
 
     # J2000 -> MOON_PA: R3(W) @ R1(Dec) @ R3(RA), batched over the N obstimes.
-    # Build each stack of 3x3 rotations elementwise then chain via einsum so
-    # there's no Python-level per-time loop. This is ~100x faster on large N.
     cw, sw = np.cos(w), np.sin(w)
     cd, sd = np.cos(dec), np.sin(dec)
     cr, sr = np.cos(ra), np.sin(ra)

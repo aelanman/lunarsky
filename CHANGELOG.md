@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.2] -- 2026-06-24
+
+## Changed
+- Vectorize transformation matrix operations
+
+
 ## [1.0.1] -- 2026-06-19
 
 ## Fixed

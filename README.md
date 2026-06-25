@@ -16,6 +16,7 @@ Non-relativistic transformations are calculated using lunar orientation data fro
 * `numpy`
 * `astropy>=6.0.0`
 * `jplephem`
+* `fastkml[lxml]`
 
 ## Installation
 
