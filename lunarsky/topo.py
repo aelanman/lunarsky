@@ -138,18 +138,19 @@ def make_transform(coo, toframe):
 
     coo_cart = coo.cartesian
 
-    # Make rotation matrices
-    # TOPO->ME is topo_matrix.T (constant); TOPO->J2000 = R(ME->J2000) @ topo_matrix.T
-    mats_list = []
-    for et, loc_idx in ets_locs:
-        loc_idx = int(loc_idx)
-        topo_mat = topo_mats[loc_idx]
-        if frame_spice_name == "MOON_ME":
-            mats_list.append(topo_mat.T)
-        else:
-            me_to_j2000 = moon_me_to_j2000(np.array([et]))[0]
-            mats_list.append(me_to_j2000 @ topo_mat.T)
-    mats = np.asarray(mats_list)
+    # Make rotation matrices, vectorized.
+    # TOPO -> ME is topo_matrix.T (constant per location); TOPO -> J2000 is
+    # R(ME->J2000) @ topo_matrix.T. Building these in a Python loop with
+    # one moon_me_to_j2000() call per ET is the main perf hot spot in the
+    # transform; do it as a single batched einsum instead.
+    loc_idx_arr = ets_locs[:, 1].astype(int)
+    topo_T_per_et = np.swapaxes(topo_mats[loc_idx_arr], -2, -1)  # (N, 3, 3)
+    if frame_spice_name == "MOON_ME":
+        mats = topo_T_per_et
+    else:
+        ets_arr = ets_locs[:, 0]
+        me_to_j2000_all = moon_me_to_j2000(ets_arr)  # (N, 3, 3) — one call
+        mats = np.einsum("nij,njk->nik", me_to_j2000_all, topo_T_per_et)
     if totopo:
         mats = np.linalg.inv(mats)
 
@@ -160,33 +161,28 @@ def make_transform(coo, toframe):
     )
 
     # If not unitspherical, shift by origin vector before rotating.
+    # Four sub-cases by (totopo, frame_id); each is vectorized over the N
+    # (et, location) pairs so finite-distance / solar-system source paths
+    # don't loop in Python.
     if not is_unitspherical:
-        orig_pos_list = []
-        for et, loc_idx in ets_locs:
-            loc_idx = int(loc_idx)
-            pos_me = pos_mes[loc_idx]
-            topo_mat = topo_mats[loc_idx]
-            et_arr = np.array([et])
+        ets_arr = ets_locs[:, 0]
+        pos_me_per_et = pos_mes[loc_idx_arr]              # (N, 3)
+        topo_mat_per_et = topo_mats[loc_idx_arr]          # (N, 3, 3)
+        if totopo:
+            if frame_id == 0:  # ICRS / SSB origin, position in J2000
+                orig_pos = station_pos_ssb_j2000(pos_me_per_et, ets_arr)
+            else:              # MCMF / Moon-center origin, position in MOON_ME
+                orig_pos = pos_me_per_et
+        else:
+            if frame_id == 0:  # SSB origin, position expressed in TOPO
+                station_ssb = station_pos_ssb_j2000(pos_me_per_et, ets_arr)
+                j2000_me = j2000_to_moon_me(ets_arr)      # (N, 3, 3)
+                ssb_station_me = -np.einsum("nij,nj->ni", j2000_me, station_ssb)
+                orig_pos = np.einsum("nij,nj->ni", topo_mat_per_et, ssb_station_me)
+            else:              # Moon-center origin, position in TOPO
+                orig_pos = -np.einsum("nij,nj->ni", topo_mat_per_et, pos_me_per_et)
 
-            if totopo:
-                # Origin = station position relative to frame origin, in coo's frame
-                if frame_id == 0:  # SSB / ICRS
-                    orig_pos_list.append(station_pos_ssb_j2000(pos_me, et_arr)[0])
-                else:  # Moon center / MCMF
-                    orig_pos_list.append(pos_me)
-            else:
-                # Origin = frame origin relative to station, in coo's frame (topo)
-                if frame_id == 0:  # SSB
-                    station_ssb = station_pos_ssb_j2000(pos_me, et_arr)[0]
-                    ssb_station_j2000 = -station_ssb
-                    # Rotate to topo
-                    j2000_me = j2000_to_moon_me(et_arr)[0]
-                    ssb_station_me = j2000_me @ ssb_station_j2000
-                    orig_pos_list.append(topo_mat @ ssb_station_me)
-                else:  # Moon center
-                    orig_pos_list.append(-(topo_mat @ pos_me))
-
-        orig_pos = np.asarray(orig_pos_list) * un.km
+        orig_pos = orig_pos * un.km
         coo_cart -= CartesianRepresentation(orig_pos.T)
 
     newrepr = coo_cart.transform(mats).reshape(shape_out)
